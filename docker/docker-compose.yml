@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mt5_automator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mt5_automator
+    restart: unless-stopped
+    
+    env_file:
+      - ../.env
+    
+    volumes:
+      # Mount logs directory
+      - ../logs:/app/logs
+      # Mount data directory
+      - ../data:/app/data
+      # Mount config (optional - can use env vars instead)
+      - ../config:/app/config:ro
+    
+    networks:
+      - mt5_network
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Optional: Memory and CPU limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  mt5_network:
+    driver: bridge
+
+# Note: For production deployment with MT5 on Windows:
+# 1. Run MT5 on a Windows VPS
+# 2. Use ZeroMQ or REST API bridge between container and MT5
+# 3. Or run this application directly on Windows without Docker
+

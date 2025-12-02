@@ -1,0 +1,260 @@
+"""
+Dry Run Mode - Shows what would be executed without actual trading
+Perfect for testing on macOS without MT5
+"""
+from typing import Dict, Any, List
+from datetime import datetime
+from src.utils import create_class_logger
+
+
+class DryRunMT5Engine:
+    """
+    Dry-run MT5 engine that logs what would be executed
+    Use this for testing on macOS or when you want to see actions without trading
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize dry-run engine"""
+        self.logger = create_class_logger('DryRunMT5')
+        self.config = config
+        self.connected = False
+        
+        # Simulated state
+        self.mock_balance = 10000.0
+        self.mock_price = 2650.0
+        self.order_counter = 1000
+        self.mock_positions = []
+        self.mock_orders = []
+        
+        self.logger.warning("="*70)
+        self.logger.warning("🧪 DRY RUN MODE ENABLED - NO REAL TRADING")
+        self.logger.warning("All MT5 commands will be SIMULATED and LOGGED")
+        self.logger.warning("="*70)
+    
+    def connect(self) -> bool:
+        """Simulate connection"""
+        self.connected = True
+        self._log_action("CONNECT", "MT5 Terminal", {"status": "simulated"})
+        return True
+    
+    def disconnect(self):
+        """Simulate disconnection"""
+        self.connected = False
+        self._log_action("DISCONNECT", "MT5 Terminal", {})
+    
+    def get_account_info(self) -> Dict[str, Any]:
+        """Return simulated account info"""
+        info = {
+            'balance': self.mock_balance,
+            'equity': self.mock_balance,
+            'margin': 1000.0,
+            'free_margin': 9000.0,
+            'currency': 'USD',
+            'leverage': 100,
+            'profit': 0.0
+        }
+        self._log_action("GET_ACCOUNT_INFO", "Account", info)
+        return info
+    
+    def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
+        """Return simulated symbol info"""
+        info = {
+            'bid': self.mock_price - 0.05,
+            'ask': self.mock_price + 0.05,
+            'point': 0.01,
+            'digits': 2,
+            'trade_contract_size': 100.0,
+            'volume_min': 0.01,
+            'volume_max': 100.0,
+            'volume_step': 0.01
+        }
+        self._log_action("GET_SYMBOL_INFO", symbol, info)
+        return info
+    
+    def get_current_price(self, symbol: str, price_type: str = 'ask') -> float:
+        """Return simulated price"""
+        if price_type == 'ask':
+            price = self.mock_price + 0.05
+        elif price_type == 'bid':
+            price = self.mock_price - 0.05
+        else:
+            price = self.mock_price
+        
+        self._log_action("GET_PRICE", symbol, {
+            'type': price_type,
+            'price': price
+        })
+        return price
+    
+    def place_order(self, signal: Dict[str, Any], position_num: int, 
+                    lot_size: float, signal_id: str) -> int:
+        """Simulate order placement - THIS IS THE KEY FUNCTION"""
+        ticket = self.order_counter
+        self.order_counter += 1
+        
+        # Determine entry and SL/TP
+        if position_num == 1:
+            entry = signal['entry_upper']
+            sl = signal.get('sl1')
+            tp = signal.get('tp1')
+        elif position_num == 2:
+            entry = signal['entry_middle']
+            sl = signal.get('sl2')
+            tp = signal.get('tp2')
+        else:
+            entry = signal['entry_lower']
+            sl = signal.get('sl3') or signal.get('sl2')
+            tp = signal.get('tp2')
+        
+        # Determine order type
+        current_price = self.get_current_price(signal['symbol'])
+        direction = signal['direction']
+        
+        if direction == 'BUY':
+            if current_price < entry:
+                order_type = "BUY LIMIT"
+            else:
+                order_type = "BUY MARKET"
+                entry = current_price
+        else:  # SELL
+            if current_price > entry:
+                order_type = "SELL LIMIT"
+            else:
+                order_type = "SELL MARKET"
+                entry = current_price
+        
+        # Log the order details
+        order_details = {
+            'ticket': ticket,
+            'type': order_type,
+            'symbol': signal['symbol'],
+            'volume': lot_size,
+            'entry_price': entry,
+            'stop_loss': sl,
+            'take_profit': tp,
+            'position_num': position_num,
+            'signal_id': signal_id,
+            'comment': f"{signal_id}_pos{position_num}"
+        }
+        
+        self._log_action("PLACE_ORDER", f"Position {position_num}", order_details)
+        
+        # Add to mock positions
+        self.mock_positions.append({
+            'ticket': ticket,
+            'signal_id': signal_id,
+            'type': order_type,
+            **order_details
+        })
+        
+        return ticket
+    
+    def modify_position(self, ticket: int, sl: float = None, tp: float = None) -> bool:
+        """Simulate position modification"""
+        self._log_action("MODIFY_POSITION", f"Ticket #{ticket}", {
+            'new_sl': sl,
+            'new_tp': tp
+        })
+        return True
+    
+    def close_position(self, ticket: int) -> bool:
+        """Simulate closing position"""
+        self._log_action("CLOSE_POSITION", f"Ticket #{ticket}", {})
+        self.mock_positions = [p for p in self.mock_positions if p['ticket'] != ticket]
+        return True
+    
+    def cancel_pending_order(self, ticket: int) -> bool:
+        """Simulate canceling order"""
+        self._log_action("CANCEL_ORDER", f"Ticket #{ticket}", {})
+        return True
+    
+    def get_positions_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
+        """Return simulated positions"""
+        positions = [p for p in self.mock_positions if p.get('signal_id') == signal_id]
+        self._log_action("GET_POSITIONS", f"Signal {signal_id}", {
+            'count': len(positions),
+            'tickets': [p['ticket'] for p in positions]
+        })
+        
+        return [{
+            'ticket': p['ticket'],
+            'symbol': p['symbol'],
+            'type': p['type'],
+            'volume': p['volume'],
+            'open_price': p['entry_price'],
+            'current_price': self.mock_price,
+            'sl': p['stop_loss'],
+            'tp': p['take_profit'],
+            'profit': 10.0,
+            'comment': p['comment']
+        } for p in positions]
+    
+    def get_pending_orders_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
+        """Return simulated pending orders"""
+        return []
+    
+    def _log_action(self, action: str, target: str, details: Dict[str, Any]):
+        """
+        Log what would be executed
+        Format: [DRY RUN] ACTION -> Target: details
+        """
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Format details nicely
+        if details:
+            details_str = "\n    " + "\n    ".join([f"{k}: {v}" for k, v in details.items()])
+        else:
+            details_str = ""
+        
+        log_msg = f"""
+╔══════════════════════════════════════════════════════════════════════
+║ 🧪 DRY RUN - {action}
+╠──────────────────────────────────────────────────────────────────────
+║ Target: {target}
+║ Time: {timestamp}{details_str}
+╚══════════════════════════════════════════════════════════════════════
+"""
+        
+        self.logger.warning(log_msg)
+        
+        # Also log to console in color
+        print(f"\033[93m{log_msg}\033[0m")
+
+
+def main():
+    """Test dry-run engine"""
+    from src.utils import load_config, setup_logging
+    
+    config = load_config()
+    logger = setup_logging(config)
+    
+    engine = DryRunMT5Engine(config)
+    
+    # Test signal
+    test_signal = {
+        'direction': 'BUY',
+        'symbol': 'XAUUSD',
+        'entry_upper': 2650.50,
+        'entry_middle': 2649.35,
+        'entry_lower': 2648.20,
+        'sl1': 2645.00,
+        'sl2': 2643.50,
+        'sl3': 2642.00,
+        'tp1': 2655.00,
+        'tp2': 2660.00
+    }
+    
+    engine.connect()
+    engine.get_account_info()
+    
+    # Place test orders
+    for i in range(1, 4):
+        ticket = engine.place_order(test_signal, i, 0.33, 'test_signal_001')
+        logger.info(f"Placed order #{ticket}")
+    
+    engine.disconnect()
+
+
+if __name__ == '__main__':
+    main()
+

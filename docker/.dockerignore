@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Environment
+.env
+*.session
+*.session-journal
+
+# Logs
+logs/
+*.log
+
+# Data
+data/*.db
+data/images/*.jpg
+data/images/*.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/
+
+# Documentation
+*.md
+

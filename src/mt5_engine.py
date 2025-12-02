@@ -1,0 +1,522 @@
+"""
+MT5 Trading Engine
+Handles MetaTrader 5 connection and trade execution
+"""
+import MetaTrader5 as mt5
+from typing import Dict, Any, Optional, List
+from datetime import datetime
+from src.utils import create_class_logger
+
+
+class MT5Engine:
+    """
+    MetaTrader 5 trading engine
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize MT5 engine
+        
+        Args:
+            config: Configuration dictionary
+        """
+        self.logger = create_class_logger('MT5Engine')
+        self.config = config
+        self.mt5_config = config.get('mt5', {})
+        self.trading_config = config.get('trading', {})
+        
+        # MT5 credentials
+        self.login = int(self.mt5_config.get('login', 0))
+        self.password = self.mt5_config.get('password', '')
+        self.server = self.mt5_config.get('server', '')
+        self.path = self.mt5_config.get('path', '')
+        
+        # Trading settings
+        self.default_symbol = self.trading_config.get('default_symbol', 'XAUUSD')
+        
+        # Connection status
+        self.connected = False
+        
+        self.logger.info("MT5Engine initialized")
+    
+    def connect(self) -> bool:
+        """
+        Connect to MT5 terminal
+        
+        Returns:
+            True if connected successfully
+        """
+        try:
+            # Initialize MT5
+            if self.path:
+                if not mt5.initialize(path=self.path):
+                    self.logger.error(f"MT5 initialize failed: {mt5.last_error()}")
+                    return False
+            else:
+                if not mt5.initialize():
+                    self.logger.error(f"MT5 initialize failed: {mt5.last_error()}")
+                    return False
+            
+            self.logger.info("MT5 initialized")
+            
+            # Login
+            if self.login and self.password and self.server:
+                if not mt5.login(self.login, self.password, self.server):
+                    self.logger.error(f"MT5 login failed: {mt5.last_error()}")
+                    mt5.shutdown()
+                    return False
+                
+                self.logger.info(f"Logged in to MT5 account: {self.login}")
+            else:
+                self.logger.warning("No login credentials provided, using current MT5 session")
+            
+            # Get account info
+            account_info = mt5.account_info()
+            if account_info is None:
+                self.logger.error("Failed to get account info")
+                return False
+            
+            self.logger.info(f"Account balance: {account_info.balance} {account_info.currency}")
+            self.logger.info(f"Account leverage: 1:{account_info.leverage}")
+            
+            self.connected = True
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error connecting to MT5: {e}", exc_info=True)
+            return False
+    
+    def disconnect(self):
+        """
+        Disconnect from MT5
+        """
+        try:
+            mt5.shutdown()
+            self.connected = False
+            self.logger.info("Disconnected from MT5")
+        except Exception as e:
+            self.logger.error(f"Error disconnecting from MT5: {e}")
+    
+    def get_account_info(self) -> Optional[Dict[str, Any]]:
+        """
+        Get account information
+        
+        Returns:
+            Account info dictionary or None
+        """
+        try:
+            account_info = mt5.account_info()
+            if account_info is None:
+                return None
+            
+            return {
+                'balance': account_info.balance,
+                'equity': account_info.equity,
+                'margin': account_info.margin,
+                'free_margin': account_info.margin_free,
+                'currency': account_info.currency,
+                'leverage': account_info.leverage,
+                'profit': account_info.profit
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting account info: {e}")
+            return None
+    
+    def get_symbol_info(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Get symbol information
+        
+        Args:
+            symbol: Trading symbol
+            
+        Returns:
+            Symbol info dictionary or None
+        """
+        try:
+            symbol_info = mt5.symbol_info(symbol)
+            if symbol_info is None:
+                self.logger.error(f"Symbol not found: {symbol}")
+                return None
+            
+            # Enable symbol if not visible
+            if not symbol_info.visible:
+                if not mt5.symbol_select(symbol, True):
+                    self.logger.error(f"Failed to enable symbol: {symbol}")
+                    return None
+            
+            return {
+                'bid': symbol_info.bid,
+                'ask': symbol_info.ask,
+                'point': symbol_info.point,
+                'digits': symbol_info.digits,
+                'trade_contract_size': symbol_info.trade_contract_size,
+                'volume_min': symbol_info.volume_min,
+                'volume_max': symbol_info.volume_max,
+                'volume_step': symbol_info.volume_step
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting symbol info for {symbol}: {e}")
+            return None
+    
+    def get_current_price(self, symbol: str, price_type: str = 'ask') -> Optional[float]:
+        """
+        Get current price for symbol
+        
+        Args:
+            symbol: Trading symbol
+            price_type: 'ask' or 'bid'
+            
+        Returns:
+            Current price or None
+        """
+        try:
+            symbol_info = mt5.symbol_info_tick(symbol)
+            if symbol_info is None:
+                return None
+            
+            if price_type == 'ask':
+                return symbol_info.ask
+            elif price_type == 'bid':
+                return symbol_info.bid
+            else:
+                return (symbol_info.ask + symbol_info.bid) / 2
+                
+        except Exception as e:
+            self.logger.error(f"Error getting price for {symbol}: {e}")
+            return None
+    
+    def place_order(self, signal: Dict[str, Any], position_num: int, lot_size: float, 
+                    signal_id: str) -> Optional[int]:
+        """
+        Place order based on signal
+        
+        Args:
+            signal: Signal dictionary
+            position_num: Position number (1, 2, or 3)
+            lot_size: Lot size
+            signal_id: Unique signal ID for tracking
+            
+        Returns:
+            Order ticket number or None if failed
+        """
+        try:
+            symbol = signal['symbol']
+            direction = signal['direction']
+            
+            # Determine entry price based on position number
+            if position_num == 1:
+                entry_price = signal['entry_upper']
+                sl = signal.get('sl1')
+                tp = signal.get('tp1')
+            elif position_num == 2:
+                entry_price = signal['entry_middle']
+                sl = signal.get('sl2')
+                tp = signal.get('tp2')
+            elif position_num == 3:
+                entry_price = signal['entry_lower']
+                sl = signal.get('sl3') or signal.get('sl2')
+                tp = signal.get('tp2')
+            else:
+                self.logger.error(f"Invalid position number: {position_num}")
+                return None
+            
+            # Get current price
+            current_price = self.get_current_price(symbol, 'ask' if direction == 'BUY' else 'bid')
+            if current_price is None:
+                self.logger.error(f"Could not get current price for {symbol}")
+                return None
+            
+            # Determine order type
+            if direction == 'BUY':
+                if current_price < entry_price:
+                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                    action = "BUY LIMIT"
+                else:
+                    order_type = mt5.ORDER_TYPE_BUY
+                    action = "BUY MARKET"
+                    entry_price = current_price
+            else:  # SELL
+                if current_price > entry_price:
+                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                    action = "SELL LIMIT"
+                else:
+                    order_type = mt5.ORDER_TYPE_SELL
+                    action = "SELL MARKET"
+                    entry_price = current_price
+            
+            # Prepare request
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL if 'MARKET' in action else mt5.TRADE_ACTION_PENDING,
+                "symbol": symbol,
+                "volume": lot_size,
+                "type": order_type,
+                "price": entry_price,
+                "deviation": 20,
+                "magic": 234000,
+                "comment": f"{signal_id}_pos{position_num}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            
+            # Add SL/TP if available
+            if sl:
+                request["sl"] = sl
+            if tp:
+                request["tp"] = tp
+            
+            # Send order
+            result = mt5.order_send(request)
+            
+            if result is None:
+                self.logger.error("Order send failed: result is None")
+                return None
+            
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                self.logger.error(f"Order failed: {result.retcode} - {result.comment}")
+                return None
+            
+            ticket = result.order if hasattr(result, 'order') else result.deal
+            self.logger.info(f"{action} #{ticket} placed: {symbol} {lot_size} lot @ {entry_price}, SL={sl}, TP={tp}")
+            
+            return ticket
+            
+        except Exception as e:
+            self.logger.error(f"Error placing order: {e}", exc_info=True)
+            return None
+    
+    def modify_position(self, ticket: int, sl: float = None, tp: float = None) -> bool:
+        """
+        Modify stop loss and/or take profit of position
+        
+        Args:
+            ticket: Position ticket
+            sl: New stop loss (None to keep current)
+            tp: New take profit (None to keep current)
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Get position info
+            position = mt5.positions_get(ticket=ticket)
+            if not position:
+                self.logger.error(f"Position {ticket} not found")
+                return False
+            
+            position = position[0]
+            
+            # Use current values if not specified
+            if sl is None:
+                sl = position.sl
+            if tp is None:
+                tp = position.tp
+            
+            # Prepare request
+            request = {
+                "action": mt5.TRADE_ACTION_SLTP,
+                "position": ticket,
+                "sl": sl,
+                "tp": tp,
+            }
+            
+            # Send request
+            result = mt5.order_send(request)
+            
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                self.logger.error(f"Modify failed: {result.retcode} - {result.comment}")
+                return False
+            
+            self.logger.info(f"Position #{ticket} modified: SL={sl}, TP={tp}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error modifying position: {e}")
+            return False
+    
+    def close_position(self, ticket: int) -> bool:
+        """
+        Close position
+        
+        Args:
+            ticket: Position ticket
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Get position info
+            position = mt5.positions_get(ticket=ticket)
+            if not position:
+                self.logger.error(f"Position {ticket} not found")
+                return False
+            
+            position = position[0]
+            
+            # Prepare close request
+            close_type = mt5.ORDER_TYPE_SELL if position.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "position": ticket,
+                "symbol": position.symbol,
+                "volume": position.volume,
+                "type": close_type,
+                "price": mt5.symbol_info_tick(position.symbol).bid if close_type == mt5.ORDER_TYPE_SELL else mt5.symbol_info_tick(position.symbol).ask,
+                "deviation": 20,
+                "magic": 234000,
+                "comment": "Close position",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            
+            result = mt5.order_send(request)
+            
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                self.logger.error(f"Close failed: {result.retcode} - {result.comment}")
+                return False
+            
+            self.logger.info(f"Position #{ticket} closed")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error closing position: {e}")
+            return False
+    
+    def cancel_pending_order(self, ticket: int) -> bool:
+        """
+        Cancel pending order
+        
+        Args:
+            ticket: Order ticket
+            
+        Returns:
+            True if successful
+        """
+        try:
+            request = {
+                "action": mt5.TRADE_ACTION_REMOVE,
+                "order": ticket,
+            }
+            
+            result = mt5.order_send(request)
+            
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                self.logger.error(f"Cancel failed: {result.retcode} - {result.comment}")
+                return False
+            
+            self.logger.info(f"Pending order #{ticket} cancelled")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error cancelling order: {e}")
+            return False
+    
+    def get_positions_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all positions for a specific signal
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            List of position dictionaries
+        """
+        try:
+            positions = mt5.positions_get()
+            if positions is None:
+                return []
+            
+            signal_positions = []
+            for pos in positions:
+                if signal_id in pos.comment:
+                    signal_positions.append({
+                        'ticket': pos.ticket,
+                        'symbol': pos.symbol,
+                        'type': 'BUY' if pos.type == mt5.ORDER_TYPE_BUY else 'SELL',
+                        'volume': pos.volume,
+                        'open_price': pos.price_open,
+                        'current_price': pos.price_current,
+                        'sl': pos.sl,
+                        'tp': pos.tp,
+                        'profit': pos.profit,
+                        'comment': pos.comment
+                    })
+            
+            return signal_positions
+            
+        except Exception as e:
+            self.logger.error(f"Error getting positions: {e}")
+            return []
+    
+    def get_pending_orders_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all pending orders for a specific signal
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            List of order dictionaries
+        """
+        try:
+            orders = mt5.orders_get()
+            if orders is None:
+                return []
+            
+            signal_orders = []
+            for order in orders:
+                if signal_id in order.comment:
+                    signal_orders.append({
+                        'ticket': order.ticket,
+                        'symbol': order.symbol,
+                        'type': order.type,
+                        'volume': order.volume,
+                        'price_open': order.price_open,
+                        'sl': order.sl,
+                        'tp': order.tp,
+                        'comment': order.comment
+                    })
+            
+            return signal_orders
+            
+        except Exception as e:
+            self.logger.error(f"Error getting pending orders: {e}")
+            return []
+
+
+def main():
+    """
+    Test MT5 engine
+    """
+    from src.utils import load_config, setup_logging
+    
+    # Load config
+    config = load_config()
+    logger = setup_logging(config)
+    
+    # Create engine
+    engine = MT5Engine(config)
+    
+    # Test connection
+    if engine.connect():
+        logger.info("MT5 connection test passed!")
+        
+        # Get account info
+        account_info = engine.get_account_info()
+        if account_info:
+            logger.info(f"Account: {account_info}")
+        
+        # Get symbol info
+        symbol_info = engine.get_symbol_info('XAUUSD')
+        if symbol_info:
+            logger.info(f"XAUUSD: Bid={symbol_info['bid']}, Ask={symbol_info['ask']}")
+        
+        # Disconnect
+        engine.disconnect()
+    else:
+        logger.error("MT5 connection test failed")
+
+
+if __name__ == '__main__':
+    main()
+

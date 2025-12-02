@@ -1,0 +1,48 @@
+telegram:
+  api_id: "${TELEGRAM_API_ID}"
+  api_hash: "${TELEGRAM_API_HASH}"
+  phone: "${TELEGRAM_PHONE}"
+  channels:
+    - "channel_username_1"
+    - "channel_username_2"
+
+mt5:
+  login: "${MT5_LOGIN}"
+  password: "${MT5_PASSWORD}"
+  server: "${MT5_SERVER}"
+  path: "C:/Program Files/MetaTrader 5/terminal64.exe"  # Windows path
+
+# AI-powered signal parsing (handles complex formats, emojis, etc.)
+ai:
+  enabled: true  # Set to true to use DeepSeek API for parsing
+  api_key: "${DEEPSEEK_API_KEY}"  # Get from https://platform.deepseek.com
+  api_base: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+  fallback_to_regex: true  # Use regex parser if AI fails
+
+# System mode
+mode:
+  dry_run: true  # true = test mode (show commands), false = production (actual trading)
+  # Set dry_run: false on Windows with MT5 for real trading
+
+trading:
+  risk_percent: 1.0
+  num_positions: 3
+  default_symbol: "XAUUSD"
+  breakeven_trigger: "middle_entry"  # or "lower_entry"
+  breakeven_offset: 0.1
+
+ocr:
+  tesseract_cmd: "/usr/bin/tesseract"  # Linux path
+  preprocessing:
+    resize_factor: 2.0
+    contrast_boost: true
+    denoise: true
+    sharpen: true
+
+logging:
+  level: "INFO"
+  file: "logs/mt5_automator.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+

@@ -1,0 +1,274 @@
+"""
+TP2 Protection System
+Manages TP2 protection logic to prevent new entries after TP2 is hit
+"""
+import asyncio
+from typing import Dict, Any, Set
+from datetime import datetime
+from src.utils import create_class_logger
+
+
+class TP2Protection:
+    """
+    TP2 Protection System
+    
+    When TP2 is hit:
+    - Cancel all pending orders for that signal
+    - Block new orders from being placed
+    - Allow existing positions to continue
+    """
+    
+    def __init__(self, config: Dict[str, Any], mt5_engine, position_tracker):
+        """
+        Initialize TP2 protection
+        
+        Args:
+            config: Configuration dictionary
+            mt5_engine: MT5Engine instance
+            position_tracker: PositionTracker instance
+        """
+        self.logger = create_class_logger('TP2Protection')
+        self.config = config
+        self.mt5_engine = mt5_engine
+        self.position_tracker = position_tracker
+        
+        # Track signals with TP2 protection active
+        self.protected_signals: Set[str] = set()
+        
+        # Track when protection was activated
+        self.protection_timestamps: Dict[str, str] = {}
+        
+        self.logger.info("TP2Protection initialized")
+    
+    def is_protected(self, signal_id: str) -> bool:
+        """
+        Check if signal has TP2 protection active
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            True if protected
+        """
+        return signal_id in self.protected_signals
+    
+    def activate_protection(self, signal_id: str) -> bool:
+        """
+        Activate TP2 protection for a signal
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            True if protection activated successfully
+        """
+        try:
+            self.logger.warning(f"Activating TP2 protection for signal {signal_id}")
+            
+            # Cancel all pending orders for this signal
+            pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
+            
+            cancelled_count = 0
+            for order in pending_orders:
+                if self.mt5_engine.cancel_pending_order(order['ticket']):
+                    cancelled_count += 1
+                    self.logger.info(f"Cancelled pending order #{order['ticket']}")
+            
+            if cancelled_count > 0:
+                self.logger.info(f"Cancelled {cancelled_count} pending orders for signal {signal_id}")
+            
+            # Add to protected set
+            self.protected_signals.add(signal_id)
+            self.protection_timestamps[signal_id] = datetime.now().isoformat()
+            
+            self.logger.warning(f"TP2 PROTECTION ACTIVE for signal {signal_id}")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error activating TP2 protection: {e}", exc_info=True)
+            return False
+    
+    def deactivate_protection(self, signal_id: str):
+        """
+        Deactivate TP2 protection (when all positions closed)
+        
+        Args:
+            signal_id: Signal ID
+        """
+        if signal_id in self.protected_signals:
+            self.protected_signals.discard(signal_id)
+            
+            if signal_id in self.protection_timestamps:
+                activated_at = self.protection_timestamps[signal_id]
+                self.logger.info(f"TP2 protection deactivated for signal {signal_id} (was active since {activated_at})")
+                del self.protection_timestamps[signal_id]
+    
+    async def monitor_tp2(self, check_interval: int = 5):
+        """
+        Monitor for TP2 hits (runs continuously)
+        
+        Args:
+            check_interval: Check interval in seconds
+        """
+        self.logger.info("Starting TP2 monitoring...")
+        
+        while True:
+            try:
+                await asyncio.sleep(check_interval)
+                
+                # Get all active signals
+                active_signals = self.position_tracker.get_all_active_signals()
+                
+                if not active_signals:
+                    continue
+                
+                # Check each signal for TP2 hit
+                for signal_id in active_signals:
+                    # Skip if already protected
+                    if self.is_protected(signal_id):
+                        # Check if all positions are closed
+                        positions = self.mt5_engine.get_positions_by_signal(signal_id)
+                        if not positions:
+                            self.deactivate_protection(signal_id)
+                        continue
+                    
+                    # Check if TP2 has been hit
+                    if self.position_tracker.check_tp_hit(signal_id, tp_level=2):
+                        self.activate_protection(signal_id)
+                
+            except Exception as e:
+                self.logger.error(f"Error in TP2 monitoring loop: {e}", exc_info=True)
+                await asyncio.sleep(check_interval)
+    
+    def can_place_order(self, signal_id: str) -> bool:
+        """
+        Check if new orders can be placed for signal
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            True if orders can be placed, False if blocked by TP2 protection
+        """
+        if self.is_protected(signal_id):
+            self.logger.warning(f"Order blocked: TP2 protection active for signal {signal_id}")
+            return False
+        return True
+    
+    def get_protected_signals(self) -> list:
+        """
+        Get list of protected signal IDs
+        
+        Returns:
+            List of signal IDs with active TP2 protection
+        """
+        return list(self.protected_signals)
+    
+    def get_protection_info(self, signal_id: str) -> Dict[str, Any]:
+        """
+        Get protection information for a signal
+        
+        Args:
+            signal_id: Signal ID
+            
+        Returns:
+            Protection info dictionary
+        """
+        if signal_id not in self.protected_signals:
+            return {'protected': False}
+        
+        return {
+            'protected': True,
+            'activated_at': self.protection_timestamps.get(signal_id, 'unknown')
+        }
+    
+    def force_activate_protection(self, signal_id: str, reason: str = "Manual"):
+        """
+        Manually activate protection (for emergency stop, etc.)
+        
+        Args:
+            signal_id: Signal ID
+            reason: Reason for activation
+        """
+        self.logger.warning(f"Force activating TP2 protection for {signal_id}: {reason}")
+        self.activate_protection(signal_id)
+    
+    def clear_all_protection(self):
+        """
+        Clear all TP2 protection (use with caution)
+        """
+        self.logger.warning("Clearing ALL TP2 protection")
+        self.protected_signals.clear()
+        self.protection_timestamps.clear()
+
+
+def main():
+    """
+    Test TP2 protection
+    """
+    import asyncio
+    from src.utils import load_config, setup_logging
+    from src.mt5_engine import MT5Engine
+    from src.position_tracker import PositionTracker
+    
+    async def test():
+        # Load config
+        config = load_config()
+        logger = setup_logging(config)
+        
+        # Create MT5 engine
+        engine = MT5Engine(config)
+        
+        if not engine.connect():
+            logger.error("Failed to connect to MT5")
+            return
+        
+        # Create position tracker
+        tracker = PositionTracker(config, engine)
+        
+        # Create TP2 protection
+        tp2_protection = TP2Protection(config, engine, tracker)
+        
+        # Test signal
+        test_signal = {
+            'direction': 'BUY',
+            'symbol': 'XAUUSD',
+            'entry_upper': 2650.50,
+            'entry_middle': 2649.35,
+            'entry_lower': 2648.20,
+            'sl1': 2645.00,
+            'tp1': 2655.00,
+            'tp2': 2660.00
+        }
+        
+        signal_id = 'test_signal_001'
+        
+        # Register signal
+        tracker.register_signal(signal_id, test_signal)
+        
+        # Test protection
+        logger.info(f"Can place order: {tp2_protection.can_place_order(signal_id)}")
+        
+        # Activate protection
+        tp2_protection.activate_protection(signal_id)
+        
+        logger.info(f"Can place order after protection: {tp2_protection.can_place_order(signal_id)}")
+        logger.info(f"Protected signals: {tp2_protection.get_protected_signals()}")
+        
+        # Monitor for a short time
+        logger.info("Monitoring TP2 for 30 seconds...")
+        
+        try:
+            await asyncio.wait_for(tp2_protection.monitor_tp2(check_interval=5), timeout=30)
+        except asyncio.TimeoutError:
+            logger.info("Monitoring test completed")
+        
+        engine.disconnect()
+    
+    asyncio.run(test())
+
+
+if __name__ == '__main__':
+    main()
+
