@@ -220,8 +220,9 @@ class MT5Engine:
                 self.logger.error(f"Invalid position number: {position_num}")
                 return None
             
-            # Get current price
-            current_price = self.get_current_price(symbol, 'ask' if direction == 'BUY' else 'bid')
+            # Get current price (simplified like dry-run: use ask for simplicity)
+            # Note: Using ask works for both BUY and SELL for order type determination
+            current_price = self.get_current_price(symbol, 'ask')
             if current_price is None:
                 self.logger.error(f"Could not get current price for {symbol}")
                 return None
@@ -245,17 +246,32 @@ class MT5Engine:
                     entry_price = current_price
             
             # Prepare request
+            # Get symbol info to determine correct filling type
+            symbol_info = mt5.symbol_info(symbol)
+            if symbol_info is None:
+                self.logger.error(f"Cannot get symbol info for {symbol}")
+                return None
+            
+            # Determine filling type (use RETURN for compatibility, fallback to FOK)
+            filling_type = symbol_info.filling_mode
+            if filling_type & 1:  # FOK available
+                filling = mt5.ORDER_FILLING_FOK
+            elif filling_type & 2:  # IOC available
+                filling = mt5.ORDER_FILLING_IOC
+            else:  # RETURN (most compatible)
+                filling = mt5.ORDER_FILLING_RETURN
+            
             request = {
                 "action": mt5.TRADE_ACTION_DEAL if 'MARKET' in action else mt5.TRADE_ACTION_PENDING,
                 "symbol": symbol,
                 "volume": lot_size,
                 "type": order_type,
                 "price": entry_price,
-                "deviation": 20,
+                "deviation": 50,  # Increased for volatile instruments like gold
                 "magic": 234000,
                 "comment": f"{signal_id}_pos{position_num}",
                 "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": filling,
             }
             
             # Add SL/TP if available
