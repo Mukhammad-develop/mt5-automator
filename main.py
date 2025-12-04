@@ -270,10 +270,10 @@ class MT5Automator:
                     self.logger.error(f"Failed to place order {i}")
             
             if successful_orders > 0:
-            self.logger.info(f"Successfully placed {successful_orders}/{num_positions} orders")
-            
-            # Summary message (always shown)
-            summary = f"""
+                self.logger.info(f"Successfully placed {successful_orders}/{num_positions} orders")
+                
+                # Summary message (always shown)
+                summary = f"""
 {'='*70}
 ✅ TRADE EXECUTED
 {'='*70}
@@ -283,8 +283,8 @@ Volume: {sum(lot_sizes[:successful_orders]):.2f} lots
 Signal ID: {signal_id}
 {'='*70}
 """
-            self.logger.warning(summary)  # WARNING level so it shows in console
-            print(f"\033[92m{summary}\033[0m")
+                self.logger.warning(summary)  # WARNING level so it shows in console
+                print(f"\033[92m{summary}\033[0m")
             else:
                 self.logger.error("Failed to place any orders")
             
