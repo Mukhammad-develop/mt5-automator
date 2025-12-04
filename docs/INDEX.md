@@ -6,10 +6,17 @@ Complete documentation for the MT5 Trading Automator system.
 
 ## 🚀 Getting Started
 
+### [WINDOWS_QUICKSTART.md](WINDOWS_QUICKSTART.md) ⭐ **NEW!**
+**Windows users start here!** Complete 20-minute production setup.
+- ✅ Full MT5 + DeepSeek AI integration
+- ✅ Step-by-step with screenshots
+- ✅ Dry-run testing → Live trading
+- ✅ Safety checklists and troubleshooting
+
 ### [QUICKSTART.md](QUICKSTART.md)
-**Start here!** 15-minute setup guide for both macOS and Windows.
+General setup guide for both platforms.
 - macOS: Testing & development (dry-run mode)
-- Windows: Production trading (real MT5)
+- Windows: Alternative shorter guide
 
 ---
 
@@ -85,8 +92,8 @@ trading:
 ### I want to test on macOS
 → [QUICKSTART.md](QUICKSTART.md) → macOS section
 
-### I want to deploy to Windows
-→ [QUICKSTART.md](QUICKSTART.md) → Windows section
+### I want to deploy to Windows for production
+→ [WINDOWS_QUICKSTART.md](WINDOWS_QUICKSTART.md) ⭐ **RECOMMENDED**
 
 ### I want to understand AI features
 → [AI_INTEGRATION.md](AI_INTEGRATION.md)
@@ -165,7 +172,8 @@ trading:
 ```
 docs/
 ├── INDEX.md (this file)          # Documentation index
-├── QUICKSTART.md                 # 15-min setup (both platforms)
+├── WINDOWS_QUICKSTART.md ⭐      # Windows production guide (RECOMMENDED)
+├── QUICKSTART.md                 # General setup (both platforms)
 ├── AI_INTEGRATION.md             # AI features & vision
 ├── PLATFORM_GUIDES.md            # Platform-specific details
 ├── PROJECT_SUMMARY.md            # Technical specifications
