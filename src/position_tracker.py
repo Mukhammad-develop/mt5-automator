@@ -191,10 +191,10 @@ class PositionTracker:
                 should_move = False
                 
                 if direction == 'BUY':
-                    if current_sl == 0 or new_sl > current_sl:
+                    if not current_sl or current_sl == 0 or new_sl > current_sl:
                         should_move = True
                 else:  # SELL
-                    if current_sl == 0 or new_sl < current_sl:
+                    if not current_sl or current_sl == 0 or new_sl < current_sl:
                         should_move = True
                 
                 if should_move:

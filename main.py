@@ -218,7 +218,6 @@ class MT5Automator:
             # Log parsed signal (always show)
             signal_summary = f"📊 Parsed: {signal['direction']} {signal['symbol']} | Entry: {signal['entry_upper']}-{signal['entry_lower']} | TP: {signal.get('tp1')}/{signal.get('tp2')} | SL: {signal.get('sl1')}"
             self.logger.warning(signal_summary)
-            print(f"\033[96m{signal_summary}\033[0m")
             
             # Generate unique signal ID
             signal_id = generate_signal_id(signal)
@@ -283,8 +282,7 @@ Volume: {sum(lot_sizes[:successful_orders]):.2f} lots
 Signal ID: {signal_id}
 {'='*70}
 """
-                self.logger.warning(summary)  # WARNING level so it shows in console
-                print(f"\033[92m{summary}\033[0m")
+                self.logger.warning(summary)
             else:
                 self.logger.error("Failed to place any orders")
             
