@@ -1,5 +1,7 @@
 # Environment
 .env
+config.env
+config/config.yaml
 *.session
 *.session-journal
 
