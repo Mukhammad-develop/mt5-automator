@@ -168,6 +168,7 @@ class MT5Automator:
             
             # Extract text
             text = signal_data['text']
+            signal = None  # Initialize signal variable
             
             # If photo, try AI vision first, fallback to OCR
             if signal_data['has_photo'] and signal_data['photo_path']:
