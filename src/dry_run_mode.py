@@ -107,10 +107,8 @@ class DryRunMT5Engine:
             tp = signal.get('tp2')
         
         # Determine order type
+        current_price = self.get_current_price(signal['symbol'])
         direction = signal['direction']
-        # CRITICAL: Use correct price type (ask for BUY, bid for SELL) - same as production
-        price_type = 'ask' if direction == 'BUY' else 'bid'
-        current_price = self.get_current_price(signal['symbol'], price_type)
         
         if direction == 'BUY':
             if current_price < entry:
@@ -142,13 +140,10 @@ class DryRunMT5Engine:
         self._log_action("PLACE_ORDER", f"Position {position_num}", order_details)
         
         # Add to mock positions
-        # IMPORTANT: Store base direction (BUY/SELL) not order type, to match production
-        base_type = 'BUY' if 'BUY' in order_type else 'SELL'
         self.mock_positions.append({
             'ticket': ticket,
             'signal_id': signal_id,
-            'type': base_type,
-            'order_type': order_type,  # Keep for logging
+            'type': order_type,
             **order_details
         })
         
@@ -196,19 +191,7 @@ class DryRunMT5Engine:
     
     def get_pending_orders_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
         """Return simulated pending orders"""
-        # In dry-run, we treat LIMIT orders as pending
-        pending = [p for p in self.mock_positions if p.get('signal_id') == signal_id and 'LIMIT' in p.get('order_type', '')]
-        
-        return [{
-            'ticket': p['ticket'],
-            'symbol': p['symbol'],
-            'type': p['order_type'],
-            'volume': p['volume'],
-            'price_open': p['entry_price'],
-            'sl': p['stop_loss'],
-            'tp': p['take_profit'],
-            'comment': p['comment']
-        } for p in pending]
+        return []
     
     def _log_action(self, action: str, target: str, details: Dict[str, Any]):
         """
