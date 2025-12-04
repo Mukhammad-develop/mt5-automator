@@ -169,34 +169,46 @@ class MT5Automator:
             # Extract text
             text = signal_data['text']
             
-            # If photo, process with OCR
+            # If photo, try AI vision first, fallback to OCR
             if signal_data['has_photo'] and signal_data['photo_path']:
-                self.logger.info("Signal contains image, running OCR...")
-                ocr_text = self.ocr_processor.process_image(signal_data['photo_path'])
+                self.logger.info("Signal contains image, processing...")
                 
-                if ocr_text:
-                    # Combine text from message and OCR
-                    text = f"{text}\n{ocr_text}"
-                    self.logger.info(f"OCR extracted {len(ocr_text)} characters")
+                # Try AI vision first (can understand images directly)
+                signal = self.ai_signal_parser.parse_signal_from_image(signal_data['photo_path'])
+                
+                if signal:
+                    self.logger.info("AI Vision successfully parsed image directly!")
+                    # Skip text parsing, we already have the signal
                 else:
-                    self.logger.warning("OCR failed to extract text")
+                    # Fallback to OCR if AI vision fails
+                    self.logger.info("AI Vision failed, trying OCR...")
+                    ocr_text = self.ocr_processor.process_image(signal_data['photo_path'])
+                    
+                    if ocr_text:
+                        # Combine text from message and OCR
+                        text = f"{text}\n{ocr_text}"
+                        self.logger.info(f"OCR extracted {len(ocr_text)} characters")
+                    else:
+                        self.logger.warning("OCR also failed to extract text")
             
-            if not text or len(text.strip()) < 10:
-                self.logger.warning("Insufficient text to parse signal")
-                return
-            
-            # Parse signal - Try AI first, fallback to regex
-            self.logger.info("Parsing signal...")
-            
-            # Try AI parser first (handles complex formats)
-            signal = self.ai_signal_parser.parse_signal(text)
-            
-            # Fallback to regex parser if AI fails or disabled
+            # If we don't have signal from image, parse text
             if not signal:
-                ai_config = self.config.get('ai', {})
-                if ai_config.get('fallback_to_regex', True):
-                    self.logger.info("Trying regex parser as fallback...")
-                    signal = self.signal_parser.parse_signal(text)
+                if not text or len(text.strip()) < 10:
+                    self.logger.warning("Insufficient text to parse signal")
+                    return
+                
+                # Parse signal - Try AI first, fallback to regex
+                self.logger.info("Parsing signal from text...")
+                
+                # Try AI parser first (handles complex formats)
+                signal = self.ai_signal_parser.parse_signal(text)
+                
+                # Fallback to regex parser if AI fails or disabled
+                if not signal:
+                    ai_config = self.config.get('ai', {})
+                    if ai_config.get('fallback_to_regex', True):
+                        self.logger.info("Trying regex parser as fallback...")
+                        signal = self.signal_parser.parse_signal(text)
             
             if not signal:
                 self.logger.warning("Failed to parse signal")

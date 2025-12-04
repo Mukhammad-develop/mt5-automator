@@ -14,11 +14,13 @@ mt5:
 
 # AI-powered signal parsing (handles complex formats, emojis, etc.)
 ai:
-  enabled: true  # Set to true to use DeepSeek API for parsing
+  enabled: true  # Set to true to use DeepSeek API
   api_key: "${DEEPSEEK_API_KEY}"  # Get from https://platform.deepseek.com
   api_base: "https://api.deepseek.com/v1"
   model: "deepseek-chat"
+  use_vision: true  # Use DeepSeek Vision for images (better than OCR)
   fallback_to_regex: true  # Use regex parser if AI fails
+  fallback_to_ocr: true  # Use Tesseract OCR if Vision fails
 
 # System mode
 mode:
