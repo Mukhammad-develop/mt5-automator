@@ -199,10 +199,10 @@ class MT5Automator:
                     return
                 
                 # Parse signal - Try AI first, fallback to regex
-            self.logger.info("Parsing signal with AI...")
-            
-            # Try AI parser first (handles complex formats)
-            signal = self.ai_signal_parser.parse_signal(text)
+                self.logger.info("Parsing signal with AI...")
+                
+                # Try AI parser first (handles complex formats)
+                signal = self.ai_signal_parser.parse_signal(text)
                 
                 # Fallback to regex parser if AI fails or disabled
                 if not signal:
