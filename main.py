@@ -199,10 +199,10 @@ class MT5Automator:
                     return
                 
                 # Parse signal - Try AI first, fallback to regex
-                self.logger.info("Parsing signal from text...")
-                
-                # Try AI parser first (handles complex formats)
-                signal = self.ai_signal_parser.parse_signal(text)
+            self.logger.info("Parsing signal with AI...")
+            
+            # Try AI parser first (handles complex formats)
+            signal = self.ai_signal_parser.parse_signal(text)
                 
                 # Fallback to regex parser if AI fails or disabled
                 if not signal:
@@ -212,11 +212,13 @@ class MT5Automator:
                         signal = self.signal_parser.parse_signal(text)
             
             if not signal:
-                self.logger.warning("Failed to parse signal")
+                self.logger.warning("⚠️  Failed to parse signal")
                 return
             
-            self.logger.info("Signal parsed successfully:")
-            self.logger.info(self.signal_parser.format_signal(signal))
+            # Log parsed signal (always show)
+            signal_summary = f"📊 Parsed: {signal['direction']} {signal['symbol']} | Entry: {signal['entry_upper']}-{signal['entry_lower']} | TP: {signal.get('tp1')}/{signal.get('tp2')} | SL: {signal.get('sl1')}"
+            self.logger.warning(signal_summary)
+            print(f"\033[96m{signal_summary}\033[0m")
             
             # Generate unique signal ID
             signal_id = generate_signal_id(signal)
@@ -268,13 +270,21 @@ class MT5Automator:
                     self.logger.error(f"Failed to place order {i}")
             
             if successful_orders > 0:
-                self.logger.info(f"Successfully placed {successful_orders}/{num_positions} orders")
-                self.logger.info("="*60)
-                self.logger.info(f"TRADE EXECUTED: {signal['direction']} {signal['symbol']}")
-                self.logger.info(f"Signal ID: {signal_id}")
-                self.logger.info(f"Orders: {successful_orders}")
-                self.logger.info(f"Total volume: {sum(lot_sizes[:successful_orders])} lots")
-                self.logger.info("="*60)
+            self.logger.info(f"Successfully placed {successful_orders}/{num_positions} orders")
+            
+            # Summary message (always shown)
+            summary = f"""
+{'='*70}
+✅ TRADE EXECUTED
+{'='*70}
+Signal: {signal['direction']} {signal['symbol']} ({signal['entry_upper']}-{signal['entry_lower']})
+Orders: {successful_orders} positions
+Volume: {sum(lot_sizes[:successful_orders]):.2f} lots
+Signal ID: {signal_id}
+{'='*70}
+"""
+            self.logger.warning(summary)  # WARNING level so it shows in console
+            print(f"\033[92m{summary}\033[0m")
             else:
                 self.logger.error("Failed to place any orders")
             

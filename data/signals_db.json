@@ -1,2 +1,19 @@
-[]
-
+[
+  {
+    "direction": "BUY",
+    "symbol": "XAUUSD",
+    "entry_upper": 2650.5,
+    "entry_middle": 2649.35,
+    "entry_lower": 2648.2,
+    "sl1": 2645.0,
+    "sl2": 2643.5,
+    "sl3": 2642.0,
+    "tp1": 2655.0,
+    "tp2": 2660.0,
+    "tp3": null,
+    "raw_text": "",
+    "parsed_by": "AI",
+    "signal_id": "59f25ae87e7d",
+    "saved_at": "2025-12-04T18:17:27.338960"
+  }
+]

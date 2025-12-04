@@ -46,9 +46,10 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
     )
     file_handler.setLevel(log_level)
     
-    # Console handler
+    # Console handler (can be different level than file)
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(log_level)
+    console_level = getattr(logging, log_config.get('console_level', 'WARNING'))
+    console_handler.setLevel(console_level)
     
     # Formatter
     formatter = logging.Formatter(

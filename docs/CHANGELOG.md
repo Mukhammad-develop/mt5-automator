@@ -2,7 +2,7 @@
 
 All notable changes to the MT5 Trading Automator project will be documented in this file.
 
-## [1.0.0] - 2025-12-02
+## [0.1.0] - 2025-12-04
 
 ### Added
 - Initial release

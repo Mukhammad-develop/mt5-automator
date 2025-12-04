@@ -195,30 +195,31 @@ class DryRunMT5Engine:
     
     def _log_action(self, action: str, target: str, details: Dict[str, Any]):
         """
-        Log what would be executed
-        Format: [DRY RUN] ACTION -> Target: details
+        Log what would be executed (simplified format)
         """
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Only log important actions to console
+        important_actions = ['PLACE_ORDER', 'MODIFY_POSITION', 'CLOSE_POSITION', 'CANCEL_ORDER']
         
-        # Format details nicely
-        if details:
-            details_str = "\n    " + "\n    ".join([f"{k}: {v}" for k, v in details.items()])
+        if action in important_actions:
+            # Format key details
+            if action == 'PLACE_ORDER':
+                msg = f"🧪 DRY RUN: {details.get('type')} {details.get('symbol')} {details.get('volume')} lot @ {details.get('entry_price')} | SL: {details.get('stop_loss')} | TP: {details.get('take_profit')} | Ticket: #{details.get('ticket')}"
+                self.logger.warning(msg)
+                print(f"\033[93m{msg}\033[0m")
+            elif action == 'MODIFY_POSITION':
+                msg = f"🧪 DRY RUN: Modified #{target.split('#')[1]} → SL: {details.get('new_sl')}"
+                self.logger.info(msg)
+            elif action == 'CLOSE_POSITION':
+                msg = f"🧪 DRY RUN: Closed position #{target.split('#')[1]}"
+                self.logger.warning(msg)
+                print(f"\033[93m{msg}\033[0m")
+            elif action == 'CANCEL_ORDER':
+                msg = f"🧪 DRY RUN: Cancelled order #{target.split('#')[1]}"
+                self.logger.warning(msg)
+                print(f"\033[93m{msg}\033[0m")
         else:
-            details_str = ""
-        
-        log_msg = f"""
-╔══════════════════════════════════════════════════════════════════════
-║ 🧪 DRY RUN - {action}
-╠──────────────────────────────────────────────────────────────────────
-║ Target: {target}
-║ Time: {timestamp}{details_str}
-╚══════════════════════════════════════════════════════════════════════
-"""
-        
-        self.logger.warning(log_msg)
-        
-        # Also log to console in color
-        print(f"\033[93m{log_msg}\033[0m")
+            # Just log to file for other actions
+            self.logger.debug(f"DRY RUN: {action} -> {target}")
 
 
 def main():
