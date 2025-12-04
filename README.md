@@ -2,12 +2,30 @@
 
 A fully automated MetaTrader 5 trading system that reads trading signals from Telegram channels (text + images via OCR), interprets them, and executes trades with complete TP/SL management and risk control.
 
-## Documentation
+## 🚀 Quick Start
+
+### For Windows Users (Production Trading)
+👉 **[WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md)** ⭐ **RECOMMENDED**
+- Complete 20-minute setup guide
+- MT5 + DeepSeek AI integration
+- Dry-run testing → Live trading
+- All troubleshooting included
+
+### For macOS Users (Development/Testing)
+👉 **[QUICKSTART.md](docs/QUICKSTART.md)** 
+- Testing environment setup
+- Dry-run mode
+- Cross-platform guide
+
+## 📚 Full Documentation
 
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART.md](docs/QUICKSTART.md) | Get started in 10 minutes |
-| [MACOS_DEVELOPMENT.md](docs/MACOS_DEVELOPMENT.md) | Development on macOS/Linux |
+| [INDEX.md](docs/INDEX.md) | Documentation hub |
+| [WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md) | Windows production guide ⭐ |
+| [QUICKSTART.md](docs/QUICKSTART.md) | General setup (both platforms) |
+| [AI_INTEGRATION.md](docs/AI_INTEGRATION.md) | DeepSeek AI features |
+| [PLATFORM_GUIDES.md](docs/PLATFORM_GUIDES.md) | Platform-specific details |
 | [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | Technical specifications |
 | [CHANGELOG.md](docs/CHANGELOG.md) | Version history |
 
