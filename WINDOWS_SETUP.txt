@@ -1,0 +1,107 @@
+========================================
+MT5 AUTOMATOR - WINDOWS SETUP (SIMPLE)
+========================================
+
+STEP 1: Download and Install
+-----------------------------
+1. Download Python from: https://www.python.org/downloads/
+   - Click "Download Python 3.10" (or newer)
+   - Run the installer
+   - ✓ CHECK the box "Add Python to PATH"
+   - Click "Install Now"
+
+2. Download MT5 from your broker's website
+   - Install it to: C:\Program Files\MetaTrader 5\
+   - Login to your account
+
+
+STEP 2: Download the Project
+-----------------------------
+1. Download the project ZIP file
+2. Extract it to: C:\Users\Admin\mt5-automator\
+3. Open folder: C:\Users\Admin\mt5-automator\
+
+
+STEP 3: Edit ONE Configuration File
+------------------------------------
+1. Open the file: config.env (right-click → Edit with Notepad)
+
+2. Fill in your details:
+
+   TELEGRAM_API_ID=21451384
+   TELEGRAM_API_HASH=634b17f24af8df3bb413e3ab2cab4c8e
+   TELEGRAM_PHONE=+421907975101
+
+   MT5_LOGIN=11206270
+   MT5_PASSWORD=6*N1Utrt
+   MT5_SERVER=VantageInternational-Demo
+
+   DEEPSEEK_API_KEY=sk-your-key-here
+
+3. Get DeepSeek API Key:
+   - Go to: https://platform.deepseek.com/
+   - Sign up (use email)
+   - Click "API Keys" → "Create New Key"
+   - Copy the key (starts with sk-...)
+   - Paste it in config.env after DEEPSEEK_API_KEY=
+
+4. Save and close the file
+
+
+STEP 4: Install Requirements
+-----------------------------
+1. Press Windows Key + R
+2. Type: cmd
+3. Press Enter
+
+4. In the black window, type these commands:
+
+   cd C:\Users\Admin\mt5-automator
+   pip install -r requirements-windows.txt
+
+   Wait for installation to finish (2-3 minutes)
+
+
+STEP 5: Run the Bot
+--------------------
+1. Make sure MT5 is open and logged in
+2. In the same black window (cmd), type:
+
+   python main.py
+
+3. First time only:
+   - It will ask for a code
+   - Check your Telegram app
+   - Enter the code you received
+   - Press Enter
+
+4. The bot will start!
+   You should see: "✅ MT5 Automator started successfully"
+
+
+STOP THE BOT
+------------
+Press Ctrl+C in the black window
+
+
+TROUBLESHOOTING
+---------------
+Problem: "Python is not recognized"
+Solution: Reinstall Python and CHECK "Add Python to PATH"
+
+Problem: "MT5 connection failed"
+Solution: Make sure MT5 is open and you're logged in
+
+Problem: "Invalid API key"
+Solution: Check your DeepSeek API key in config.env
+
+Problem: "Telegram error"
+Solution: Check your Telegram credentials in config.env
+
+
+CONTACT SUPPORT
+---------------
+If you have problems, send:
+1. Screenshot of the error
+2. Your config.env file (hide your passwords first!)
+
