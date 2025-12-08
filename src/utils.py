@@ -153,7 +153,8 @@ def _load_config_from_env() -> Dict[str, Any]:
             'symbol_mapping': symbol_mapping,
             'breakeven_enabled': os.getenv('BREAKEVEN_ENABLED', 'false').lower() == 'true',
             'breakeven_trigger': os.getenv('BREAKEVEN_TRIGGER', 'middle_entry'),
-            'breakeven_offset': float(os.getenv('BREAKEVEN_OFFSET', '5.0'))
+            'breakeven_offset': float(os.getenv('BREAKEVEN_OFFSET', '5.0')),
+            'tp2_move_to_breakeven': os.getenv('TP2_MOVE_TO_BREAKEVEN', 'true').lower() == 'true'
         },
         'ocr': {
             'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',

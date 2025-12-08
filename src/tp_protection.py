@@ -32,13 +32,20 @@ class TP2Protection:
         self.mt5_engine = mt5_engine
         self.position_tracker = position_tracker
         
+        # TP2 settings
+        self.trading_config = config.get('trading', {})
+        self.tp2_move_to_breakeven = self.trading_config.get('tp2_move_to_breakeven', True)
+        
         # Track signals with TP2 protection active
         self.protected_signals: Set[str] = set()
         
         # Track when protection was activated
         self.protection_timestamps: Dict[str, str] = {}
         
-        self.logger.info("TP2Protection initialized")
+        if self.tp2_move_to_breakeven:
+            self.logger.info("TP2Protection initialized: Will move positions to BE when TP2 hit")
+        else:
+            self.logger.info("TP2Protection initialized: Will NOT move positions to BE")
     
     def is_protected(self, signal_id: str) -> bool:
         """
@@ -52,12 +59,13 @@ class TP2Protection:
         """
         return signal_id in self.protected_signals
     
-    def activate_protection(self, signal_id: str) -> bool:
+    def activate_protection(self, signal_id: str, move_to_breakeven: bool = True) -> bool:
         """
         Activate TP2 protection for a signal
         
         Args:
             signal_id: Signal ID
+            move_to_breakeven: Whether to move remaining positions' SL to breakeven
             
         Returns:
             True if protection activated successfully
@@ -77,6 +85,10 @@ class TP2Protection:
             if cancelled_count > 0:
                 self.logger.info(f"Cancelled {cancelled_count} pending orders for signal {signal_id}")
             
+            # Move remaining positions to breakeven (protect profits)
+            if move_to_breakeven:
+                self._move_positions_to_breakeven(signal_id)
+            
             # Add to protected set
             self.protected_signals.add(signal_id)
             self.protection_timestamps[signal_id] = datetime.now().isoformat()
@@ -88,6 +100,60 @@ class TP2Protection:
         except Exception as e:
             self.logger.error(f"Error activating TP2 protection: {e}", exc_info=True)
             return False
+    
+    def _move_positions_to_breakeven(self, signal_id: str):
+        """
+        Move all remaining positions for a signal to breakeven
+        
+        Args:
+            signal_id: Signal ID
+        """
+        try:
+            # Get signal info
+            signal_info = self.position_tracker.get_signal_info(signal_id)
+            if not signal_info:
+                return
+            
+            signal = signal_info.get('signal', {})
+            direction = signal.get('direction', '')
+            
+            # Get open positions
+            positions = self.mt5_engine.get_positions_by_signal(signal_id)
+            
+            if not positions:
+                self.logger.info(f"No open positions to move to BE for signal {signal_id}")
+                return
+            
+            moved_count = 0
+            for position in positions:
+                entry_price = position['open_price']
+                current_sl = position.get('sl', 0)
+                
+                # Calculate breakeven SL (entry + small buffer for spread/commission)
+                if direction == 'BUY':
+                    new_sl = entry_price + 0.1
+                    # Only move if new SL is better than current
+                    if not current_sl or current_sl == 0 or new_sl > current_sl:
+                        if self.mt5_engine.modify_position(position['ticket'], sl=new_sl):
+                            self.logger.info(f"✅ Moved position #{position['ticket']} to BE: SL={new_sl} (TP2 protection)")
+                            moved_count += 1
+                        else:
+                            self.logger.warning(f"Failed to move position #{position['ticket']} to BE")
+                else:  # SELL
+                    new_sl = entry_price - 0.1
+                    # Only move if new SL is better than current
+                    if not current_sl or current_sl == 0 or new_sl < current_sl:
+                        if self.mt5_engine.modify_position(position['ticket'], sl=new_sl):
+                            self.logger.info(f"✅ Moved position #{position['ticket']} to BE: SL={new_sl} (TP2 protection)")
+                            moved_count += 1
+                        else:
+                            self.logger.warning(f"Failed to move position #{position['ticket']} to BE")
+            
+            if moved_count > 0:
+                self.logger.warning(f"🛡️ Moved {moved_count} position(s) to BREAKEVEN (TP2 protection)")
+            
+        except Exception as e:
+            self.logger.error(f"Error moving positions to breakeven: {e}", exc_info=True)
     
     def deactivate_protection(self, signal_id: str):
         """
@@ -135,7 +201,7 @@ class TP2Protection:
                     
                     # Check if TP2 has been hit
                     if self.position_tracker.check_tp_hit(signal_id, tp_level=2):
-                        self.activate_protection(signal_id)
+                        self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
                 
             except Exception as e:
                 self.logger.error(f"Error in TP2 monitoring loop: {e}", exc_info=True)
