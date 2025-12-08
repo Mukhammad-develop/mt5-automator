@@ -1,0 +1,85 @@
+================================================
+   ✅ AUTOMATIC SYMBOL DETECTION - NOW ENABLED!
+================================================
+
+GOOD NEWS: The bot now detects broker symbols AUTOMATICALLY!
+============================================================
+
+You DON'T need to configure anything manually!
+
+The bot will:
+1. Try the signal symbol first (e.g., XAUUSD)
+2. Try common variations (XAUUSD+, XAUUSD., #XAUUSD, GOLD, etc.)
+3. Search through all broker symbols to find the best match
+4. Remember the mapping for next time (cached)
+
+
+WORKS FOR ALL PAIRS AUTOMATICALLY:
+===================================
+✅ XAUUSD → XAUUSD+ (or whatever your broker uses)
+✅ EURUSD → EURUSD.a (or whatever your broker uses)
+✅ GBPUSD → GBPUSD# (or whatever your broker uses)
+✅ BTCUSD → #BTCUSD (or whatever your broker uses)
+... and so on for ANY symbol!
+
+
+HOW IT WORKS:
+=============
+Signal says: BUY XAUUSD 2650 - 2648
+              ↓
+Bot checks: XAUUSD not found
+              ↓
+Bot tries: XAUUSD+, XAUUSD., XAUUSDm, GOLD...
+              ↓
+Bot finds: XAUUSD+ ✅
+              ↓
+Bot saves: XAUUSD → XAUUSD+ (for next time)
+              ↓
+Bot trades: XAUUSD+ successfully!
+
+
+WHAT YOU SEE IN THE LOG:
+=========================
+2025-12-08 10:30:45 [INFO] 🔄 Symbol auto-resolved: XAUUSD → XAUUSD+
+2025-12-08 10:30:46 [INFO] Order placed successfully
+
+
+CACHED SYMBOLS:
+===============
+The bot saves detected symbols in: data/symbol_mapping_cache.json
+
+Once a symbol is detected, it's instant next time!
+
+
+MANUAL OVERRIDE (Optional):
+============================
+If you want to manually specify symbols, you can still use:
+
+config.env:
+SYMBOL_MAPPING=XAUUSD=XAUUSD+,EURUSD=EURUSD.a
+
+But usually, automatic detection is better!
+
+
+NO CONFIGURATION NEEDED!
+=========================
+Just run the bot and it will figure out your broker's symbol names automatically!
+
+
+SUPPORTED SYMBOLS:
+==================
+- All Forex pairs (EURUSD, GBPUSD, USDJPY, etc.)
+- Gold/Silver (XAUUSD, XAGUSD)
+- Crypto (BTCUSD, ETHUSD)
+- Any other symbol your broker offers!
+
+
+THIS WORKS ON WINDOWS PRODUCTION ONLY
+======================================
+(Dry-run mode on macOS uses simulated symbols)
+
+
+THAT'S IT!
+==========
+No manual configuration needed. The bot is now TRULY automatic! 🚀
+

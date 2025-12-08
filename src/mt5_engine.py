@@ -164,6 +164,7 @@ class MT5Engine:
     def map_symbol(self, symbol: str) -> str:
         """
         Map signal symbol to broker-specific symbol
+        Uses manual mapping from config if available, otherwise returns as-is
         
         Args:
             symbol: Signal symbol (e.g., XAUUSD)
@@ -171,9 +172,10 @@ class MT5Engine:
         Returns:
             Broker symbol (e.g., XAUUSD+ or mapped symbol)
         """
+        # Check manual mapping first (for user overrides)
         if symbol in self.symbol_mapping:
             mapped = self.symbol_mapping[symbol]
-            self.logger.info(f"Symbol mapping: {symbol} → {mapped}")
+            self.logger.debug(f"Manual symbol mapping: {symbol} → {mapped}")
             return mapped
         return symbol
     

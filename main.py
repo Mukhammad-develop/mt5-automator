@@ -24,6 +24,7 @@ except ImportError:
 from src.risk_manager import RiskManager
 from src.position_tracker import PositionTracker
 from src.tp_protection import TP2Protection
+from src.symbol_resolver import SymbolResolver
 
 
 class MT5Automator:
@@ -74,6 +75,7 @@ class MT5Automator:
         self.risk_manager = None
         self.position_tracker = None
         self.tp2_protection = None
+        self.symbol_resolver = None
         
         # System state
         self.running = False
@@ -92,6 +94,11 @@ class MT5Automator:
                 return False
             
             self.logger.info("MT5 connected successfully")
+            
+            # Initialize symbol resolver (auto-detects broker symbol names)
+            if not self.dry_run and MT5_AVAILABLE:
+                self.symbol_resolver = SymbolResolver(self.mt5_engine, self.config)
+                self.logger.info("✅ Smart symbol resolver enabled (auto-detects broker symbols)")
             
             # Initialize risk manager and trackers
             self.risk_manager = RiskManager(self.config, self.mt5_engine)
@@ -214,6 +221,14 @@ class MT5Automator:
             if not signal:
                 self.logger.warning("⚠️  Failed to parse signal")
                 return
+            
+            # Resolve symbol to broker-specific name (automatic detection)
+            if self.symbol_resolver:
+                original_symbol = signal['symbol']
+                broker_symbol = self.symbol_resolver.resolve(original_symbol)
+                if broker_symbol != original_symbol:
+                    self.logger.info(f"🔄 Symbol auto-resolved: {original_symbol} → {broker_symbol}")
+                signal['symbol'] = broker_symbol
             
             # Log parsed signal (always show)
             signal_summary = f"📊 Parsed: {signal['direction']} {signal['symbol']} | Entry: {signal['entry_upper']}-{signal['entry_lower']} | TP: {signal.get('tp1')}/{signal.get('tp2')} | SL: {signal.get('sl1')}"
