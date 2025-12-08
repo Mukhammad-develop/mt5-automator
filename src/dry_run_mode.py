@@ -142,6 +142,18 @@ class DryRunMT5Engine:
                 order_type = "SELL MARKET"
                 entry = current_price
         
+        # CRITICAL: SL/TP attached to order from the start (simulated)
+        # In real MT5, these are in the initial request, not added later!
+        if sl:
+            self.logger.info(f"✅ (DRY-RUN) SL attached to order: {sl}")
+        else:
+            self.logger.warning(f"⚠️ (DRY-RUN) No SL - RISKY!")
+        
+        if tp:
+            self.logger.info(f"✅ (DRY-RUN) TP attached to order: {tp}")
+        else:
+            self.logger.warning(f"⚠️ (DRY-RUN) No TP")
+        
         # Log the order details
         order_details = {
             'ticket': ticket,

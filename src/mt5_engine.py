@@ -287,6 +287,10 @@ class MT5Engine:
             else:  # RETURN (most compatible)
                 filling = mt5.ORDER_FILLING_RETURN
             
+            # CRITICAL: SL and TP MUST be in the initial request
+            # This ensures protection from the FIRST MOMENT order fills
+            # Never set SL/TP after - that creates a dangerous gap!
+            
             request = {
                 "action": mt5.TRADE_ACTION_DEAL if 'MARKET' in action else mt5.TRADE_ACTION_PENDING,
                 "symbol": symbol,
@@ -300,11 +304,18 @@ class MT5Engine:
                 "type_filling": filling,
             }
             
-            # Add SL/TP if available
+            # ALWAYS attach SL/TP to order (CRITICAL for safety!)
             if sl:
-                request["sl"] = sl
+                request["sl"] = float(sl)
+                self.logger.info(f"✅ SL attached to order: {sl} (will be active immediately when filled)")
+            else:
+                self.logger.warning(f"⚠️ No SL provided for position {position_num} - RISKY!")
+            
             if tp:
-                request["tp"] = tp
+                request["tp"] = float(tp)
+                self.logger.info(f"✅ TP attached to order: {tp} (will be active immediately when filled)")
+            else:
+                self.logger.warning(f"⚠️ No TP provided for position {position_num}")
             
             # Send order
             result = mt5.order_send(request)
@@ -318,7 +329,16 @@ class MT5Engine:
                 return None
             
             ticket = result.order if hasattr(result, 'order') else result.deal
-            self.logger.info(f"{action} #{ticket} placed: {symbol} {lot_size} lot @ {entry_price}, SL={sl}, TP={tp}")
+            
+            # Confirm SL/TP are attached
+            if sl and tp:
+                self.logger.info(f"✅ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | SL={sl} TP={tp} ATTACHED")
+            elif sl:
+                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | SL={sl} (NO TP)")
+            elif tp:
+                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | TP={tp} (NO SL - DANGEROUS!)")
+            else:
+                self.logger.warning(f"❌ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | NO SL/TP - UNPROTECTED!")
             
             return ticket
             
