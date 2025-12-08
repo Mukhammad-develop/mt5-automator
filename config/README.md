@@ -1,117 +1,112 @@
-# Configuration Files
+# Configuration (Simple - ONE File Only!)
 
-## Setup Instructions
+## For Windows Production Users
 
-### 1. Create Your Configuration Files
+You only need to edit **ONE file**: `config.env`
 
-Copy the example files and customize them:
+All settings (Telegram, MT5, DeepSeek, channels) are in this single file.
 
-```bash
-# Copy config.yaml
-cp config/config.yaml.example config/config.yaml
+### Quick Setup (3 Steps)
 
-# Copy .env
-cp config.env.example config.env
-# OR
-cp config.env.example .env  # Place in root directory
-```
+**Step 1:** Open `config.env` with Notepad
 
-### 2. Edit config.yaml
-
-Update with your settings:
-
-```yaml
-telegram:
-  channels:
-    - "your_channel_username"  # Your actual channel
-
-mode:
-  dry_run: true  # false for production on Windows
-
-trading:
-  risk_percent: 1.0  # Your risk tolerance
-```
-
-### 3. Edit config.env (or .env)
-
-Add your API credentials:
+**Step 2:** Fill in your details:
 
 ```bash
-TELEGRAM_API_ID=your_actual_api_id
-TELEGRAM_API_HASH=your_actual_api_hash
-TELEGRAM_PHONE=+1234567890
-DEEPSEEK_API_KEY=sk-your-actual-key
+# ===== TELEGRAM SETTINGS =====
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE=+421907975101
+TELEGRAM_CHANNELS=google_target_qaaw,another_channel,third_channel
+
+# ===== MT5 SETTINGS =====
+MT5_LOGIN=your_mt5_login
+MT5_PASSWORD=your_mt5_password
+MT5_SERVER=your_broker_server
+
+# ===== DEEPSEEK AI SETTINGS =====
+DEEPSEEK_API_KEY=sk-your-actual-key-here
 ```
+
+**Step 3:** Save and run `python main.py`
+
+That's it! No YAML files, no multiple config files.
+
+## Getting Your API Keys
+
+### 1. Telegram API (Required)
+
+1. Go to: https://my.telegram.org/auth
+2. Login with your phone number
+3. Click "API development tools"
+4. Create a new application
+5. Copy your `api_id` and `api_hash`
+6. Paste them in `config.env`
+
+### 2. DeepSeek API (Required)
+
+1. Go to: https://platform.deepseek.com/
+2. Sign up (free account)
+3. Click "API Keys" in dashboard
+4. Click "Create New Key"
+5. Copy the key (starts with `sk-...`)
+6. Paste it in `config.env`
+
+### 3. Add Telegram Channels
+
+In `config.env`, find this line:
+
+```bash
+TELEGRAM_CHANNELS=google_target_qaaw
+```
+
+To add multiple channels, separate them with commas:
+
+```bash
+TELEGRAM_CHANNELS=channel1,channel2,channel3
+```
+
+You can use:
+- Channel usernames: `google_target_qaaw`
+- Channel IDs: `-1003397933414`
 
 ## Security Notes
 
 ⚠️ **IMPORTANT:**
-- `config.yaml` and `config.env` contain **sensitive credentials**
-- These files are in `.gitignore` and **will not be committed to git**
-- **Never** share these files publicly
-- **Never** commit them to GitHub
+- `config.env` contains your passwords and API keys
+- This file is **NOT** committed to git (it's in `.gitignore`)
+- **Never** share this file publicly
+- Keep it safe on your computer only
 
-✅ **Safe to commit:**
-- `config.yaml.example`
-- `config.env.example`
+## Settings You Can Change
 
-❌ **Never commit:**
-- `config.yaml` (your actual config)
-- `config.env` (your actual credentials)
-- `.env` (your actual credentials)
+All in `config.env`:
 
-## File Locations
-
-```
-mt5_automator/
-├── config/
-│   ├── config.yaml.example  ✅ Template (in git)
-│   └── config.yaml          ❌ Your config (NOT in git)
-├── config.env.example       ✅ Template (in git)
-├── config.env               ❌ Your credentials (NOT in git)
-└── .env                     ❌ Your credentials (NOT in git)
-```
-
-## Getting API Keys
-
-### Telegram API
-1. Visit: https://my.telegram.org/auth
-2. Login with your phone
-3. Go to "API development tools"
-4. Create app → Copy `api_id` and `api_hash`
-
-### DeepSeek API
-1. Visit: https://platform.deepseek.com
-2. Create account
-3. Get API key from dashboard
-
-## Quick Start
-
-```bash
-# 1. Setup
-cp config/config.yaml.example config/config.yaml
-cp config.env.example .env
-
-# 2. Edit files with your credentials
-nano config/config.yaml
-nano .env
-
-# 3. Run
-python3 main.py
-```
+| Setting | Description | Example |
+|---------|-------------|---------|
+| `RISK_PERCENT` | Risk per trade (%) | `1.0` = 1% |
+| `NUM_POSITIONS` | How many positions per signal | `3` |
+| `DEFAULT_SYMBOL` | Trading symbol | `XAUUSD` |
+| `DRY_RUN` | Test mode (true/false) | `false` for real trading |
 
 ## Troubleshooting
 
-**"Config file not found"**
-- Make sure you copied `config.yaml.example` to `config.yaml`
+**"Invalid literal for int()"**
+→ You forgot to add values in `config.env`
 
-**"Environment variable not set"**
-- Make sure you created `.env` or `config.env`
-- Check file is in the correct location
+**"Telegram error"**
+→ Check your `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`
 
-**"Invalid credentials"**
-- Verify API keys are correct
-- Check for extra spaces or quotes
+**"MT5 connection failed"**
+→ Check your `MT5_LOGIN`, `MT5_PASSWORD`, `MT5_SERVER`
+→ Make sure MT5 is open and logged in
 
-For more help, see: [../docs/QUICKSTART.md](../docs/QUICKSTART.md)
+**"DeepSeek API error"**
+→ Check your `DEEPSEEK_API_KEY` is correct
 
+## For Advanced Users (Optional)
+
+If you prefer YAML configuration, you can still create `config/config.yaml` manually.
+The system will use it if it exists, otherwise it uses `config.env` directly.
+
+For 99% of users: **Just use config.env!**
