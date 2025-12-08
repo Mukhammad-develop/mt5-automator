@@ -36,6 +36,10 @@ class PositionTracker:
         self.trailing_stop_pips = self.trading_config.get('trailing_stop_pips', 20)
         self.trailing_stop_activation_pips = self.trading_config.get('trailing_stop_activation_pips', 10)
         
+        # Position 3 Runner Strategy
+        self.position_3_runner_enabled = self.trading_config.get('position_3_runner_enabled', True)
+        self.position_3_trailing_after_tp2 = self.trading_config.get('position_3_trailing_after_tp2', True)
+        
         # Convert pips to points (for different symbols)
         # For GOLD (XAUUSD): 1 pip = 0.01, so 20 pips = 0.20
         # For Forex: 1 pip = 0.0001, so 20 pips = 0.0020
@@ -47,11 +51,21 @@ class PositionTracker:
         # Track best prices for trailing stop (highest for BUY, lowest for SELL)
         self.position_best_prices: Dict[int, float] = {}
         
+        # Track which Position 3 runners have had TP2 reached (allowed to trail)
+        self.position_3_trailing_activated: Set[int] = set()
+        
+        # Track when TP2 is reached for each signal
+        self.tp2_reached_signals: Set[str] = set()
+        
         # Track active signals
         self.active_signals: Dict[str, Dict[str, Any]] = {}
         
         if self.trailing_stop_enabled:
-            self.logger.info(f"PositionTracker initialized: TRAILING STOP enabled, distance={self.trailing_stop_pips} pips, activation={self.trailing_stop_activation_pips} pips")
+            if self.position_3_runner_enabled and self.position_3_trailing_after_tp2:
+                self.logger.info(f"PositionTracker initialized: TRAILING STOP enabled, distance={self.trailing_stop_pips} pips")
+                self.logger.info(f"🏃 Position 3 RUNNER strategy enabled: Trailing activates AFTER TP2 reached")
+            else:
+                self.logger.info(f"PositionTracker initialized: TRAILING STOP enabled, distance={self.trailing_stop_pips} pips, activation={self.trailing_stop_activation_pips} pips")
         elif self.breakeven_enabled:
             self.logger.warning(f"PositionTracker initialized: BE enabled (DEPRECATED), trigger={self.breakeven_trigger}, offset={self.breakeven_offset}")
         else:
@@ -150,10 +164,15 @@ class PositionTracker:
             if current_price is None:
                 return
             
+            # Check if TP2 has been reached (for Position 3 runner strategy)
+            if self.position_3_runner_enabled and self.position_3_trailing_after_tp2:
+                if signal_id not in self.tp2_reached_signals:
+                    await self._check_tp2_reached(signal_id, signal, current_price, direction, positions)
+            
             # Check trailing stop (preferred) or breakeven for each position
             if self.trailing_stop_enabled:
                 for position in positions:
-                    await self._check_trailing_stop(position, signal, current_price, direction)
+                    await self._check_trailing_stop(position, signal, current_price, direction, signal_id)
             elif self.breakeven_enabled:
                 for position in positions:
                     await self._check_breakeven(position, signal, current_price, direction)
@@ -161,8 +180,59 @@ class PositionTracker:
         except Exception as e:
             self.logger.error(f"Error checking signal positions: {e}")
     
+    async def _check_tp2_reached(self, signal_id: str, signal: Dict[str, Any], 
+                                 current_price: float, direction: str, positions: List[Dict[str, Any]]):
+        """
+        Check if TP2 price has been reached and activate trailing for Position 3
+        
+        Args:
+            signal_id: Signal ID
+            signal: Signal dictionary
+            current_price: Current market price
+            direction: Trade direction
+            positions: List of open positions
+        """
+        try:
+            tp2_price = signal.get('tp2')
+            if not tp2_price:
+                return
+            
+            # Check if TP2 price has been reached
+            tp2_reached = False
+            
+            if direction == 'BUY':
+                # For BUY, check if price reached TP2 (above TP2)
+                if current_price >= tp2_price:
+                    tp2_reached = True
+            else:  # SELL
+                # For SELL, check if price reached TP2 (below TP2)
+                if current_price <= tp2_price:
+                    tp2_reached = True
+            
+            if tp2_reached:
+                # Mark TP2 as reached for this signal
+                self.tp2_reached_signals.add(signal_id)
+                self.logger.warning(f"🎯 TP2 REACHED for signal {signal_id} at price {current_price}")
+                
+                # Find Position 3 and activate trailing
+                for position in positions:
+                    # Check if this is Position 3 (from comment field)
+                    comment = position.get('comment', '')
+                    if '_pos3' in comment:
+                        ticket = position['ticket']
+                        if ticket not in self.position_3_trailing_activated:
+                            self.position_3_trailing_activated.add(ticket)
+                            self.logger.warning(f"🏃 Position 3 #{ticket} RUNNER activated - Trailing stop now enabled!")
+                            
+                            # Initialize best price for trailing
+                            self.position_best_prices[ticket] = current_price
+                            break
+        
+        except Exception as e:
+            self.logger.error(f"Error checking TP2 reached: {e}", exc_info=True)
+    
     async def _check_trailing_stop(self, position: Dict[str, Any], signal: Dict[str, Any],
-                                   current_price: float, direction: str):
+                                   current_price: float, direction: str, signal_id: str = None):
         """
         Check and apply trailing stop logic
         
@@ -171,12 +241,22 @@ class PositionTracker:
             signal: Signal dictionary
             current_price: Current market price
             direction: Trade direction (BUY/SELL)
+            signal_id: Signal ID (optional, for Position 3 runner check)
         """
         try:
             ticket = position['ticket']
             entry_price = position['open_price']
             current_sl = position.get('sl', 0)
             symbol = signal['symbol']
+            comment = position.get('comment', '')
+            
+            # Check if this is Position 3 with runner strategy
+            is_position_3 = '_pos3' in comment
+            if is_position_3 and self.position_3_runner_enabled and self.position_3_trailing_after_tp2:
+                # Position 3: Only trail if TP2 has been reached
+                if ticket not in self.position_3_trailing_activated:
+                    # TP2 not reached yet, don't trail
+                    return
             
             # Calculate pip value based on symbol
             # For GOLD (XAUUSD): 1 pip = 0.01

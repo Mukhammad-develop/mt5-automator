@@ -159,7 +159,9 @@ def _load_config_from_env() -> Dict[str, Any]:
             'staged_entry_enabled': os.getenv('STAGED_ENTRY_ENABLED', 'true').lower() == 'true',
             'trailing_stop_enabled': os.getenv('TRAILING_STOP_ENABLED', 'true').lower() == 'true',
             'trailing_stop_pips': float(os.getenv('TRAILING_STOP_PIPS', '20')),
-            'trailing_stop_activation_pips': float(os.getenv('TRAILING_STOP_ACTIVATION_PIPS', '10'))
+            'trailing_stop_activation_pips': float(os.getenv('TRAILING_STOP_ACTIVATION_PIPS', '10')),
+            'position_3_runner_enabled': os.getenv('POSITION_3_RUNNER_ENABLED', 'true').lower() == 'true',
+            'position_3_trailing_after_tp2': os.getenv('POSITION_3_TRAILING_AFTER_TP2', 'true').lower() == 'true'
         },
         'ocr': {
             'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',

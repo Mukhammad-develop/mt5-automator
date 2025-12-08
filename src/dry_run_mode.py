@@ -114,6 +114,7 @@ class DryRunMT5Engine:
         # Get trading config
         position_1_tp_setting = self.trading_config.get('position_1_tp', 'TP1').upper()
         staged_entry_enabled = self.trading_config.get('staged_entry_enabled', True)
+        position_3_runner_enabled = self.trading_config.get('position_3_runner_enabled', True)
         
         # Determine entry and SL/TP
         if position_num == 1:
@@ -132,7 +133,14 @@ class DryRunMT5Engine:
         else:
             entry = signal['entry_lower']
             sl = signal.get('sl3') or signal.get('sl2')
-            tp = signal.get('tp2')
+            
+            # Position 3 "Runner" Strategy
+            if position_3_runner_enabled:
+                # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
+                tp = None
+                self.logger.info(f"(DRY-RUN) 🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
+            else:
+                tp = signal.get('tp2')
         
         # Determine order type
         current_price = self.get_current_price(symbol)
