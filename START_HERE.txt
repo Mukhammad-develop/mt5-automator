@@ -6,15 +6,22 @@ STEP 1: Edit config.env File
 -----------------------------
 1. Find the file: config.env
 2. Right-click → Open with Notepad
-3. Change this line:
+
+3. Change DeepSeek API Key:
    
    DEEPSEEK_API_KEY=sk-your-actual-deepseek-api-key-here
 
-4. Get your key from: https://platform.deepseek.com/
+   Get your key from: https://platform.deepseek.com/
    - Sign up (free)
    - Click "API Keys"
    - Copy the key
    - Paste it after DEEPSEEK_API_KEY=
+
+4. Add Telegram Channels (optional):
+   
+   TELEGRAM_CHANNELS=google_target_qaaw,another_channel,third_channel
+   
+   (Separate multiple channels with commas)
 
 5. Save and close Notepad
 

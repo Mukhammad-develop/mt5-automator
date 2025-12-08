@@ -103,13 +103,17 @@ def _load_config_from_env() -> Dict[str, Any]:
     Returns:
         Configuration dictionary
     """
+    # Parse channels from comma-separated string
+    channels_str = os.getenv('TELEGRAM_CHANNELS', 'google_target_qaaw')
+    channels = [ch.strip() for ch in channels_str.split(',') if ch.strip()]
+    
     return {
         'telegram': {
             'api_id': int(os.getenv('TELEGRAM_API_ID', '0')),
             'api_hash': os.getenv('TELEGRAM_API_HASH', ''),
             'phone': os.getenv('TELEGRAM_PHONE', ''),
             'session_name': os.getenv('TELEGRAM_SESSION', 'mt5_automator_session'),
-            'channels': ['google_target_qaaw']  # Default channel
+            'channels': channels
         },
         'mt5': {
             'login': int(os.getenv('MT5_LOGIN', '0')),

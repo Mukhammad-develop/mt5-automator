@@ -31,6 +31,7 @@ STEP 3: Edit ONE Configuration File
    TELEGRAM_API_ID=21451384
    TELEGRAM_API_HASH=634b17f24af8df3bb413e3ab2cab4c8e
    TELEGRAM_PHONE=+421907975101
+   TELEGRAM_CHANNELS=google_target_qaaw,another_channel
 
    MT5_LOGIN=11206270
    MT5_PASSWORD=6*N1Utrt
@@ -45,7 +46,11 @@ STEP 3: Edit ONE Configuration File
    - Copy the key (starts with sk-...)
    - Paste it in config.env after DEEPSEEK_API_KEY=
 
-4. Save and close the file
+4. Add Telegram Channels:
+   - Separate multiple channels with commas
+   - Example: TELEGRAM_CHANNELS=channel1,channel2,channel3
+
+5. Save and close the file
 
 
 STEP 4: Install Requirements
