@@ -67,7 +67,7 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
 
 def load_config(config_path: str = 'config/config.yaml') -> Dict[str, Any]:
     """
-    Load configuration from YAML file with environment variable substitution
+    Load configuration from YAML file or directly from config.env
     
     Args:
         config_path: Path to config file
@@ -75,8 +75,12 @@ def load_config(config_path: str = 'config/config.yaml') -> Dict[str, Any]:
     Returns:
         Configuration dictionary
     """
-    # Load environment variables
-    load_dotenv()
+    # Load environment variables from config.env
+    load_dotenv('config.env')
+    
+    # If config.yaml doesn't exist, use simple config from environment variables
+    if not os.path.exists(config_path):
+        return _load_config_from_env()
     
     # Read YAML file
     with open(config_path, 'r') as f:
@@ -89,6 +93,69 @@ def load_config(config_path: str = 'config/config.yaml') -> Dict[str, Any]:
     config = yaml.safe_load(config_str)
     
     return config
+
+
+def _load_config_from_env() -> Dict[str, Any]:
+    """
+    Create config directly from environment variables (config.env).
+    This is the simplified approach for non-technical users.
+    
+    Returns:
+        Configuration dictionary
+    """
+    return {
+        'telegram': {
+            'api_id': int(os.getenv('TELEGRAM_API_ID', '0')),
+            'api_hash': os.getenv('TELEGRAM_API_HASH', ''),
+            'phone': os.getenv('TELEGRAM_PHONE', ''),
+            'session_name': os.getenv('TELEGRAM_SESSION', 'mt5_automator_session'),
+            'channels': ['google_target_qaaw']  # Default channel
+        },
+        'mt5': {
+            'login': int(os.getenv('MT5_LOGIN', '0')),
+            'password': os.getenv('MT5_PASSWORD', ''),
+            'server': os.getenv('MT5_SERVER', ''),
+            'path': 'C:/Program Files/MetaTrader 5/terminal64.exe'
+        },
+        'ai': {
+            'enabled': True,
+            'api_key': os.getenv('DEEPSEEK_API_KEY', ''),
+            'api_base': 'https://api.deepseek.com/v1',
+            'model': 'deepseek-chat',
+            'vision_model': 'deepseek-reasoner',
+            'use_vision': True,
+            'fallback_to_ocr': True,
+            'fallback_to_regex': True,
+            'max_retries': 2,
+            'timeout': 30
+        },
+        'mode': {
+            'dry_run': os.getenv('DRY_RUN', 'false').lower() == 'true'
+        },
+        'trading': {
+            'risk_percent': float(os.getenv('RISK_PERCENT', '1.0')),
+            'num_positions': int(os.getenv('NUM_POSITIONS', '3')),
+            'default_symbol': os.getenv('DEFAULT_SYMBOL', 'XAUUSD'),
+            'breakeven_trigger': 'middle_entry',
+            'breakeven_offset': 0.1
+        },
+        'ocr': {
+            'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',
+            'preprocessing': {
+                'resize_factor': 2.0,
+                'contrast_boost': True,
+                'denoise': True,
+                'sharpen': True
+            }
+        },
+        'logging': {
+            'level': 'INFO',
+            'console_level': 'WARNING',
+            'file': 'logs/mt5_automator.log',
+            'max_bytes': 10485760,
+            'backup_count': 5
+        }
+    }
 
 
 def generate_signal_id(signal_data: Dict[str, Any]) -> str:
