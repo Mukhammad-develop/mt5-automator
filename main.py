@@ -6,7 +6,8 @@ import asyncio
 import sys
 import signal
 from typing import Dict, Any
-from src.utils import load_config, setup_logging, generate_signal_id, save_signal_to_db
+from src.utils import (load_config, setup_logging, generate_signal_id, 
+                       save_signal_to_db, check_signal_status, update_signal_status)
 from src.telegram_monitor import TelegramMonitor
 from src.ocr_processor import OCRProcessor
 from src.signal_parser import SignalParser
@@ -238,9 +239,15 @@ class MT5Automator:
             signal_id = generate_signal_id(signal)
             signal['signal_id'] = signal_id
             
-            # Check TP2 protection
+            # Check if signal was already completed (TP2 hit before)
+            existing_status = check_signal_status(signal_id)
+            if existing_status in ['tp2_hit', 'completed']:
+                self.logger.warning(f"⚠️ Signal {signal_id} already completed (status: {existing_status}) - SKIPPING to avoid re-entry")
+                return
+            
+            # Check TP2 protection (current session)
             if self.tp2_protection.is_protected(signal_id):
-                self.logger.warning(f"Signal {signal_id} is protected by TP2, skipping")
+                self.logger.warning(f"⚠️ Signal {signal_id} is protected by TP2 - SKIPPING")
                 return
             
             # Save signal to database

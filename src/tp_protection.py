@@ -5,7 +5,7 @@ Manages TP2 protection logic to prevent new entries after TP2 is hit
 import asyncio
 from typing import Dict, Any, Set
 from datetime import datetime
-from src.utils import create_class_logger
+from src.utils import create_class_logger, update_signal_status
 
 
 class TP2Protection:
@@ -93,7 +93,11 @@ class TP2Protection:
             self.protected_signals.add(signal_id)
             self.protection_timestamps[signal_id] = datetime.now().isoformat()
             
-            self.logger.warning(f"TP2 PROTECTION ACTIVE for signal {signal_id}")
+            # Mark signal as TP2 hit in database (prevents re-entry even after restart)
+            if update_signal_status(signal_id, 'tp2_hit'):
+                self.logger.info(f"✅ Signal {signal_id} marked as 'tp2_hit' in database")
+            
+            self.logger.warning(f"🛡️ TP2 PROTECTION ACTIVE for signal {signal_id} (will NOT re-enter if posted again)")
             
             return True
             

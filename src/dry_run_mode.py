@@ -111,11 +111,20 @@ class DryRunMT5Engine:
         signal_with_mapped_symbol = signal.copy()
         signal_with_mapped_symbol['symbol'] = symbol
         
+        # Get trading config
+        position_1_tp_setting = self.trading_config.get('position_1_tp', 'TP1').upper()
+        staged_entry_enabled = self.trading_config.get('staged_entry_enabled', True)
+        
         # Determine entry and SL/TP
         if position_num == 1:
             entry = signal['entry_upper']
             sl = signal.get('sl1')
-            tp = signal.get('tp1')
+            # Configurable TP for Position 1
+            if position_1_tp_setting == 'TP2':
+                tp = signal.get('tp2')
+                self.logger.info(f"(DRY-RUN) Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+            else:
+                tp = signal.get('tp1')
         elif position_num == 2:
             entry = signal['entry_middle']
             sl = signal.get('sl2')
@@ -128,6 +137,20 @@ class DryRunMT5Engine:
         # Determine order type
         current_price = self.get_current_price(symbol)
         direction = signal['direction']
+        
+        # STAGED ENTRY LOGIC: Prevents all 3 positions from filling at once
+        # Only place LIMIT orders at prices that haven't been touched yet
+        if staged_entry_enabled:
+            if direction == 'BUY':
+                # For BUY: only place LIMIT if current price is BELOW entry
+                if current_price >= entry:
+                    self.logger.warning(f"⚠️ (DRY-RUN) Staged Entry: Skipping Position {position_num} - price already at {entry} (current: {current_price})")
+                    return None
+            else:  # SELL
+                # For SELL: only place LIMIT if current price is ABOVE entry
+                if current_price <= entry:
+                    self.logger.warning(f"⚠️ (DRY-RUN) Staged Entry: Skipping Position {position_num} - price already at {entry} (current: {current_price})")
+                    return None
         
         if direction == 'BUY':
             if current_price < entry:

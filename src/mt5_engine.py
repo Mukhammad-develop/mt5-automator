@@ -229,11 +229,21 @@ class MT5Engine:
             symbol = self.map_symbol(symbol)
             direction = signal['direction']
             
-            # Determine entry price based on position number
+            # Get trading config
+            trading_config = self.config.get('trading', {})
+            position_1_tp_setting = trading_config.get('position_1_tp', 'TP1').upper()
+            staged_entry_enabled = trading_config.get('staged_entry_enabled', True)
+            
+            # Determine entry price and SL/TP based on position number
             if position_num == 1:
                 entry_price = signal['entry_upper']
                 sl = signal.get('sl1')
-                tp = signal.get('tp1')
+                # Configurable TP for Position 1
+                if position_1_tp_setting == 'TP2':
+                    tp = signal.get('tp2')
+                    self.logger.info(f"Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+                else:
+                    tp = signal.get('tp1')
             elif position_num == 2:
                 entry_price = signal['entry_middle']
                 sl = signal.get('sl2')
@@ -252,6 +262,21 @@ class MT5Engine:
             if current_price is None:
                 self.logger.error(f"Could not get current price for {symbol}")
                 return None
+            
+            # STAGED ENTRY LOGIC: Prevents all 3 positions from filling at once
+            # Only place LIMIT orders at prices that haven't been touched yet
+            if staged_entry_enabled:
+                if direction == 'BUY':
+                    # For BUY: only place LIMIT if current price is BELOW entry
+                    # If price already passed this entry, SKIP it (don't place market order)
+                    if current_price >= entry_price:
+                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at {entry_price} (current: {current_price})")
+                        return None
+                else:  # SELL
+                    # For SELL: only place LIMIT if current price is ABOVE entry
+                    if current_price <= entry_price:
+                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at {entry_price} (current: {current_price})")
+                        return None
             
             # Determine order type
             if direction == 'BUY':

@@ -154,7 +154,9 @@ def _load_config_from_env() -> Dict[str, Any]:
             'breakeven_enabled': os.getenv('BREAKEVEN_ENABLED', 'false').lower() == 'true',
             'breakeven_trigger': os.getenv('BREAKEVEN_TRIGGER', 'middle_entry'),
             'breakeven_offset': float(os.getenv('BREAKEVEN_OFFSET', '5.0')),
-            'tp2_move_to_breakeven': os.getenv('TP2_MOVE_TO_BREAKEVEN', 'true').lower() == 'true'
+            'tp2_move_to_breakeven': os.getenv('TP2_MOVE_TO_BREAKEVEN', 'true').lower() == 'true',
+            'position_1_tp': os.getenv('POSITION_1_TP', 'TP1').upper(),  # TP1 or TP2
+            'staged_entry_enabled': os.getenv('STAGED_ENTRY_ENABLED', 'true').lower() == 'true'
         },
         'ocr': {
             'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',
@@ -209,8 +211,9 @@ def save_signal_to_db(signal: Dict[str, Any], db_path: str = 'data/signals_db.js
     else:
         signals = []
     
-    # Add timestamp
+    # Add timestamp and status
     signal['saved_at'] = datetime.now().isoformat()
+    signal['status'] = signal.get('status', 'active')  # Default: active
     
     # Append new signal
     signals.append(signal)
@@ -238,7 +241,7 @@ def load_signals_from_db(db_path: str = 'data/signals_db.json') -> list:
 
 def get_signal_by_id(signal_id: str, db_path: str = 'data/signals_db.json') -> Optional[Dict[str, Any]]:
     """
-    Get signal by ID from database
+    Get signal by ID from database (returns most recent)
     
     Args:
         signal_id: Signal ID
@@ -248,9 +251,65 @@ def get_signal_by_id(signal_id: str, db_path: str = 'data/signals_db.json') -> O
         Signal dictionary or None
     """
     signals = load_signals_from_db(db_path)
-    for signal in signals:
+    # Return most recent signal with this ID (in case of duplicates)
+    for signal in reversed(signals):  # Start from end (most recent)
         if signal.get('signal_id') == signal_id:
             return signal
+    return None
+
+
+def update_signal_status(signal_id: str, status: str, db_path: str = 'data/signals_db.json') -> bool:
+    """
+    Update signal status in database
+    
+    Args:
+        signal_id: Signal ID
+        status: New status ('active', 'tp2_hit', 'completed', 'cancelled')
+        db_path: Path to database file
+        
+    Returns:
+        True if updated successfully
+    """
+    try:
+        if not os.path.exists(db_path):
+            return False
+        
+        with open(db_path, 'r') as f:
+            signals = json.load(f)
+        
+        # Update all signals with this ID (in case of duplicates)
+        updated = False
+        for signal in signals:
+            if signal.get('signal_id') == signal_id:
+                signal['status'] = status
+                signal['status_updated_at'] = datetime.now().isoformat()
+                updated = True
+        
+        if updated:
+            with open(db_path, 'w') as f:
+                json.dump(signals, f, indent=2)
+        
+        return updated
+        
+    except Exception as e:
+        print(f"Error updating signal status: {e}")
+        return False
+
+
+def check_signal_status(signal_id: str, db_path: str = 'data/signals_db.json') -> Optional[str]:
+    """
+    Check status of a signal in database
+    
+    Args:
+        signal_id: Signal ID
+        db_path: Path to database file
+        
+    Returns:
+        Signal status or None if not found
+    """
+    signal = get_signal_by_id(signal_id, db_path)
+    if signal:
+        return signal.get('status', 'unknown')
     return None
 
 

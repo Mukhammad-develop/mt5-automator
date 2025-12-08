@@ -205,3 +205,4 @@ class SymbolResolver:
         """Get current cache contents"""
         return self.cache.copy()
 
+
