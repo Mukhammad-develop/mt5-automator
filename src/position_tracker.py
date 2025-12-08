@@ -26,21 +26,36 @@ class PositionTracker:
         self.trading_config = config.get('trading', {})
         self.mt5_engine = mt5_engine
         
-        # Breakeven settings
+        # Breakeven settings (DEPRECATED - use trailing stop instead)
         self.breakeven_enabled = self.trading_config.get('breakeven_enabled', False)
         self.breakeven_trigger = self.trading_config.get('breakeven_trigger', 'middle_entry')
         self.breakeven_offset = self.trading_config.get('breakeven_offset', 5.0)
         
+        # Trailing Stop settings (NEW)
+        self.trailing_stop_enabled = self.trading_config.get('trailing_stop_enabled', True)
+        self.trailing_stop_pips = self.trading_config.get('trailing_stop_pips', 20)
+        self.trailing_stop_activation_pips = self.trading_config.get('trailing_stop_activation_pips', 10)
+        
+        # Convert pips to points (for different symbols)
+        # For GOLD (XAUUSD): 1 pip = 0.01, so 20 pips = 0.20
+        # For Forex: 1 pip = 0.0001, so 20 pips = 0.0020
+        # We'll calculate dynamically based on symbol
+        
         # Track positions that have been moved to breakeven
         self.breakeven_positions: Set[int] = set()
+        
+        # Track best prices for trailing stop (highest for BUY, lowest for SELL)
+        self.position_best_prices: Dict[int, float] = {}
         
         # Track active signals
         self.active_signals: Dict[str, Dict[str, Any]] = {}
         
-        if self.breakeven_enabled:
-            self.logger.info(f"PositionTracker initialized: BE enabled, trigger={self.breakeven_trigger}, offset={self.breakeven_offset}")
+        if self.trailing_stop_enabled:
+            self.logger.info(f"PositionTracker initialized: TRAILING STOP enabled, distance={self.trailing_stop_pips} pips, activation={self.trailing_stop_activation_pips} pips")
+        elif self.breakeven_enabled:
+            self.logger.warning(f"PositionTracker initialized: BE enabled (DEPRECATED), trigger={self.breakeven_trigger}, offset={self.breakeven_offset}")
         else:
-            self.logger.info("PositionTracker initialized: Breakeven DISABLED")
+            self.logger.warning("PositionTracker initialized: No SL management (not recommended)")
     
     def register_signal(self, signal_id: str, signal: Dict[str, Any]):
         """
@@ -135,17 +150,109 @@ class PositionTracker:
             if current_price is None:
                 return
             
-            # Check breakeven for each position
-            for position in positions:
-                await self._check_breakeven(position, signal, current_price, direction)
+            # Check trailing stop (preferred) or breakeven for each position
+            if self.trailing_stop_enabled:
+                for position in positions:
+                    await self._check_trailing_stop(position, signal, current_price, direction)
+            elif self.breakeven_enabled:
+                for position in positions:
+                    await self._check_breakeven(position, signal, current_price, direction)
             
         except Exception as e:
             self.logger.error(f"Error checking signal positions: {e}")
     
+    async def _check_trailing_stop(self, position: Dict[str, Any], signal: Dict[str, Any],
+                                   current_price: float, direction: str):
+        """
+        Check and apply trailing stop logic
+        
+        Args:
+            position: Position dictionary
+            signal: Signal dictionary
+            current_price: Current market price
+            direction: Trade direction (BUY/SELL)
+        """
+        try:
+            ticket = position['ticket']
+            entry_price = position['open_price']
+            current_sl = position.get('sl', 0)
+            symbol = signal['symbol']
+            
+            # Calculate pip value based on symbol
+            # For GOLD (XAUUSD): 1 pip = 0.01
+            # For Forex pairs: 1 pip = 0.0001 (except JPY pairs: 0.01)
+            if 'XAU' in symbol or 'GOLD' in symbol:
+                pip_value = 0.01
+            elif 'JPY' in symbol:
+                pip_value = 0.01
+            else:
+                pip_value = 0.0001
+            
+            # Convert pips to price points
+            trailing_distance = self.trailing_stop_pips * pip_value
+            activation_distance = self.trailing_stop_activation_pips * pip_value
+            
+            # Calculate current profit in pips
+            if direction == 'BUY':
+                profit_distance = current_price - entry_price
+            else:  # SELL
+                profit_distance = entry_price - current_price
+            
+            # Check if position is profitable enough to activate trailing stop
+            if profit_distance < activation_distance:
+                # Not enough profit yet, don't trail
+                return
+            
+            # Initialize or update best price for this position
+            if ticket not in self.position_best_prices:
+                # First time tracking this position
+                self.position_best_prices[ticket] = current_price
+                self.logger.info(f"📊 Trailing stop activated for #{ticket} (profit: {profit_distance/pip_value:.1f} pips)")
+            
+            # Update best price
+            if direction == 'BUY':
+                # For BUY: Track highest price
+                if current_price > self.position_best_prices[ticket]:
+                    self.position_best_prices[ticket] = current_price
+                    self.logger.debug(f"New high for BUY #{ticket}: {current_price}")
+            else:  # SELL
+                # For SELL: Track lowest price
+                if current_price < self.position_best_prices[ticket]:
+                    self.position_best_prices[ticket] = current_price
+                    self.logger.debug(f"New low for SELL #{ticket}: {current_price}")
+            
+            # Calculate new SL based on best price
+            best_price = self.position_best_prices[ticket]
+            
+            if direction == 'BUY':
+                # For BUY: SL should be trailing_distance BELOW best price
+                new_sl = best_price - trailing_distance
+                # Only move SL UP (never down)
+                should_move = not current_sl or current_sl == 0 or new_sl > current_sl
+            else:  # SELL
+                # For SELL: SL should be trailing_distance ABOVE best price
+                new_sl = best_price + trailing_distance
+                # Only move SL DOWN (never up)
+                should_move = not current_sl or current_sl == 0 or new_sl < current_sl
+            
+            if should_move:
+                # Move SL
+                success = self.mt5_engine.modify_position(ticket, sl=new_sl)
+                
+                if success:
+                    profit_locked = (new_sl - entry_price) if direction == 'BUY' else (entry_price - new_sl)
+                    profit_pips = profit_locked / pip_value
+                    self.logger.warning(f"🔒 Trailing Stop moved for #{ticket}: SL={new_sl:.2f} (locking {profit_pips:.1f} pips profit)")
+                else:
+                    self.logger.warning(f"Failed to update trailing stop for #{ticket}")
+        
+        except Exception as e:
+            self.logger.error(f"Error checking trailing stop: {e}", exc_info=True)
+    
     async def _check_breakeven(self, position: Dict[str, Any], signal: Dict[str, Any],
                                current_price: float, direction: str):
         """
-        Check and apply breakeven logic
+        Check and apply breakeven logic (DEPRECATED - use trailing stop instead)
         
         Args:
             position: Position dictionary

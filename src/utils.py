@@ -156,7 +156,10 @@ def _load_config_from_env() -> Dict[str, Any]:
             'breakeven_offset': float(os.getenv('BREAKEVEN_OFFSET', '5.0')),
             'tp2_move_to_breakeven': os.getenv('TP2_MOVE_TO_BREAKEVEN', 'true').lower() == 'true',
             'position_1_tp': os.getenv('POSITION_1_TP', 'TP1').upper(),  # TP1 or TP2
-            'staged_entry_enabled': os.getenv('STAGED_ENTRY_ENABLED', 'true').lower() == 'true'
+            'staged_entry_enabled': os.getenv('STAGED_ENTRY_ENABLED', 'true').lower() == 'true',
+            'trailing_stop_enabled': os.getenv('TRAILING_STOP_ENABLED', 'true').lower() == 'true',
+            'trailing_stop_pips': float(os.getenv('TRAILING_STOP_PIPS', '20')),
+            'trailing_stop_activation_pips': float(os.getenv('TRAILING_STOP_ACTIVATION_PIPS', '10'))
         },
         'ocr': {
             'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',
