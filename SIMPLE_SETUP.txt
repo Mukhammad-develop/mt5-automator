@@ -1,0 +1,79 @@
+=========================================
+    MT5 AUTOMATOR - SUPER SIMPLE GUIDE
+=========================================
+
+ONLY ONE FILE TO EDIT: config.env
+==================================
+
+NOT .env ❌
+NOT config.yaml ❌
+ONLY config.env ✅
+
+
+STEP 1: Get DeepSeek API Key (2 minutes)
+-----------------------------------------
+1. Open your browser
+2. Go to: https://platform.deepseek.com
+3. Click "Sign Up" (free)
+4. Click "API Keys"
+5. Click "Create New Key"
+6. Copy the key (starts with sk-...)
+7. Keep this window open
+
+
+STEP 2: Edit config.env (1 minute)
+-----------------------------------
+1. Find file: config.env
+2. Right-click → Open with Notepad
+3. Find this line:
+
+   DEEPSEEK_API_KEY=sk-your-actual-deepseek-api-key-here
+
+4. Replace with your key from Step 1
+5. Save (Ctrl+S)
+6. Close Notepad
+
+
+STEP 3: Install & Run (2 minutes)
+----------------------------------
+1. Press Windows Key + R
+2. Type: cmd
+3. Press Enter
+4. Copy and paste these commands:
+
+   cd C:\Users\Admin\mt5-automator
+   pip install -r requirements-windows.txt
+   python main.py
+
+5. First time: Enter the code from Telegram
+6. DONE! Bot is running!
+
+
+QUICK ANSWERS
+=============
+
+Q: Do I need .env file?
+A: NO! Only config.env
+
+Q: Do I need config.yaml?
+A: NO! Only config.env
+
+Q: Can bot trade EURUSD, GBPUSD, etc?
+A: YES! Any pair the signal mentions
+
+Q: How to add more channels?
+A: In config.env, find:
+   TELEGRAM_CHANNELS=google_target_qaaw
+   
+   Change to:
+   TELEGRAM_CHANNELS=channel1,channel2,channel3
+
+Q: How to stop the bot?
+A: Press Ctrl+C in the black window
+
+
+THAT'S IT!
+==========
+Only ONE file: config.env
+Everything else is automatic!
+

@@ -24,6 +24,8 @@ STEP 2: Download the Project
 
 STEP 3: Edit ONE Configuration File
 ------------------------------------
+NOTE: Only config.env is needed (NOT .env, NOT config.yaml)
+
 1. Open the file: config.env (right-click → Edit with Notepad)
 
 2. Fill in your details:

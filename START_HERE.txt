@@ -2,9 +2,12 @@
   MT5 AUTOMATOR - QUICK START (3 STEPS ONLY!)
 ===============================================
 
+NOTE: You only need ONE file: config.env
+         (NOT .env, NOT config.yaml)
+
 STEP 1: Edit config.env File
 -----------------------------
-1. Find the file: config.env
+1. Find the file: config.env (in the main folder)
 2. Right-click → Open with Notepad
 
 3. Change DeepSeek API Key:
