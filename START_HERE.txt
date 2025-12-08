@@ -1,0 +1,54 @@
+===============================================
+  MT5 AUTOMATOR - QUICK START (3 STEPS ONLY!)
+===============================================
+
+STEP 1: Edit config.env File
+-----------------------------
+1. Find the file: config.env
+2. Right-click → Open with Notepad
+3. Change this line:
+   
+   DEEPSEEK_API_KEY=sk-your-actual-deepseek-api-key-here
+
+4. Get your key from: https://platform.deepseek.com/
+   - Sign up (free)
+   - Click "API Keys"
+   - Copy the key
+   - Paste it after DEEPSEEK_API_KEY=
+
+5. Save and close Notepad
+
+
+STEP 2: Install
+---------------
+1. Press Windows Key + R
+2. Type: cmd
+3. Press Enter
+4. Copy and paste ALL these lines (one at a time):
+
+   cd C:\Users\Admin\mt5-automator
+   pip install -r requirements-windows.txt
+
+
+STEP 3: Run
+-----------
+1. Open MT5 and login
+2. In the same cmd window, type:
+
+   python main.py
+
+3. DONE! The bot is running!
+
+
+TO STOP THE BOT
+--------------
+Press Ctrl+C in the cmd window
+
+
+THAT'S IT! ONLY 3 STEPS!
+========================
+
+If you see errors, send me:
+1. Screenshot of the error
+2. Your config.env file
+
