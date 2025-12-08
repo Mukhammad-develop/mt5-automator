@@ -33,11 +33,14 @@ class MT5Engine:
         
         # Trading settings
         self.default_symbol = self.trading_config.get('default_symbol', 'XAUUSD')
+        self.symbol_mapping = self.trading_config.get('symbol_mapping', {})
         
         # Connection status
         self.connected = False
         
         self.logger.info("MT5Engine initialized")
+        if self.symbol_mapping:
+            self.logger.info(f"Symbol mapping enabled: {self.symbol_mapping}")
     
     def connect(self) -> bool:
         """
@@ -158,6 +161,22 @@ class MT5Engine:
             self.logger.error(f"Error getting symbol info for {symbol}: {e}")
             return None
     
+    def map_symbol(self, symbol: str) -> str:
+        """
+        Map signal symbol to broker-specific symbol
+        
+        Args:
+            symbol: Signal symbol (e.g., XAUUSD)
+            
+        Returns:
+            Broker symbol (e.g., XAUUSD+ or mapped symbol)
+        """
+        if symbol in self.symbol_mapping:
+            mapped = self.symbol_mapping[symbol]
+            self.logger.info(f"Symbol mapping: {symbol} → {mapped}")
+            return mapped
+        return symbol
+    
     def get_current_price(self, symbol: str, price_type: str = 'ask') -> Optional[float]:
         """
         Get current price for symbol
@@ -170,6 +189,9 @@ class MT5Engine:
             Current price or None
         """
         try:
+            # Map symbol to broker-specific name
+            symbol = self.map_symbol(symbol)
+            
             symbol_info = mt5.symbol_info_tick(symbol)
             if symbol_info is None:
                 return None
@@ -201,6 +223,8 @@ class MT5Engine:
         """
         try:
             symbol = signal['symbol']
+            # Map to broker-specific symbol name
+            symbol = self.map_symbol(symbol)
             direction = signal['direction']
             
             # Determine entry price based on position number

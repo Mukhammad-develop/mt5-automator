@@ -107,6 +107,16 @@ def _load_config_from_env() -> Dict[str, Any]:
     channels_str = os.getenv('TELEGRAM_CHANNELS', 'google_target_qaaw')
     channels = [ch.strip() for ch in channels_str.split(',') if ch.strip()]
     
+    # Parse symbol mapping from comma-separated string
+    # Format: XAUUSD=XAUUSD+,EURUSD=EURUSD.a
+    symbol_mapping = {}
+    mapping_str = os.getenv('SYMBOL_MAPPING', '')
+    if mapping_str:
+        for mapping in mapping_str.split(','):
+            if '=' in mapping:
+                signal_sym, broker_sym = mapping.split('=', 1)
+                symbol_mapping[signal_sym.strip()] = broker_sym.strip()
+    
     return {
         'telegram': {
             'api_id': int(os.getenv('TELEGRAM_API_ID', '0')),
@@ -140,6 +150,7 @@ def _load_config_from_env() -> Dict[str, Any]:
             'risk_percent': float(os.getenv('RISK_PERCENT', '1.0')),
             'num_positions': int(os.getenv('NUM_POSITIONS', '3')),
             'default_symbol': os.getenv('DEFAULT_SYMBOL', 'XAUUSD'),
+            'symbol_mapping': symbol_mapping,
             'breakeven_trigger': 'middle_entry',
             'breakeven_offset': 0.1
         },

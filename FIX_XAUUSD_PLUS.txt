@@ -1,0 +1,85 @@
+=====================================================
+   FIX FOR "Symbol XAUUSD+ Not Found" ERROR
+=====================================================
+
+PROBLEM: Your broker uses different symbol names
+Demo account: XAUUSD
+Real account: XAUUSD+ (or similar)
+
+SOLUTION: Tell the bot about your broker's symbol names
+=======================================================
+
+STEP 1: Find Your Broker's Symbol Names
+----------------------------------------
+1. Open MT5 (your REAL account)
+2. Press Ctrl+U (or View → Market Watch)
+3. Right-click in Market Watch → Show All
+4. Find the symbol you want to trade
+5. Copy the EXACT name you see
+
+Examples of what you might see:
+- XAUUSD+
+- XAUUSD.
+- XAUUSDm
+- #XAUUSD
+- GOLD
+- etc.
+
+
+STEP 2: Edit config.env
+------------------------
+1. Open: config.env
+2. Find this line:
+
+   SYMBOL_MAPPING=
+
+3. Add your broker's symbol names:
+
+   SYMBOL_MAPPING=XAUUSD=XAUUSD+
+
+   If you have multiple symbols:
+   
+   SYMBOL_MAPPING=XAUUSD=XAUUSD+,EURUSD=EURUSD.a,GBPUSD=GBPUSD#
+
+4. Save the file
+
+
+STEP 3: Restart the Bot
+------------------------
+1. Stop the bot (Ctrl+C)
+2. Run again: python main.py
+
+
+EXAMPLES
+========
+
+Example 1: Broker uses "XAUUSD+"
+---------------------------------
+SYMBOL_MAPPING=XAUUSD=XAUUSD+
+
+
+Example 2: Broker uses "GOLD"
+------------------------------
+SYMBOL_MAPPING=XAUUSD=GOLD
+
+
+Example 3: Multiple symbols with suffixes
+------------------------------------------
+SYMBOL_MAPPING=XAUUSD=XAUUSD+,EURUSD=EURUSD.a,GBPUSD=GBPUSD#
+
+
+Example 4: All symbols with dot suffix
+---------------------------------------
+SYMBOL_MAPPING=XAUUSD=XAUUSD.,EURUSD=EURUSD.,GBPUSD=GBPUSD.
+
+
+HOW IT WORKS
+============
+Signal says: BUY XAUUSD 2650 - 2648
+Bot maps it to: BUY XAUUSD+ 2650 - 2648 (using your broker's name)
+
+
+THAT'S IT!
+==========
+The bot will now translate symbol names automatically!
+

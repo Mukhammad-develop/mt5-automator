@@ -19,6 +19,10 @@ class DryRunMT5Engine:
         self.config = config
         self.connected = False
         
+        # Trading settings
+        self.trading_config = config.get('trading', {})
+        self.symbol_mapping = self.trading_config.get('symbol_mapping', {})
+        
         # Simulated state
         self.mock_balance = 10000.0
         self.mock_price = 2650.0
