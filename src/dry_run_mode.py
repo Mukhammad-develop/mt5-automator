@@ -35,9 +35,19 @@ class DryRunMT5Engine:
         self.logger.warning("All MT5 commands will be SIMULATED and LOGGED")
         self.logger.warning("="*70)
     
+    def map_symbol(self, symbol: str) -> str:
+        """Map signal symbol to broker-specific symbol"""
+        if symbol in self.symbol_mapping:
+            mapped = self.symbol_mapping[symbol]
+            self.logger.info(f"Symbol mapping: {symbol} → {mapped}")
+            return mapped
+        return symbol
+    
     def connect(self) -> bool:
         """Simulate connection"""
         self.connected = True
+        if self.symbol_mapping:
+            self.logger.info(f"Symbol mapping enabled: {self.symbol_mapping}")
         self._log_action("CONNECT", "MT5 Terminal", {"status": "simulated"})
         return True
     
@@ -96,6 +106,11 @@ class DryRunMT5Engine:
         ticket = self.order_counter
         self.order_counter += 1
         
+        # Map symbol to broker-specific name
+        symbol = self.map_symbol(signal['symbol'])
+        signal_with_mapped_symbol = signal.copy()
+        signal_with_mapped_symbol['symbol'] = symbol
+        
         # Determine entry and SL/TP
         if position_num == 1:
             entry = signal['entry_upper']
@@ -111,7 +126,7 @@ class DryRunMT5Engine:
             tp = signal.get('tp2')
         
         # Determine order type
-        current_price = self.get_current_price(signal['symbol'])
+        current_price = self.get_current_price(symbol)
         direction = signal['direction']
         
         if direction == 'BUY':
@@ -131,7 +146,7 @@ class DryRunMT5Engine:
         order_details = {
             'ticket': ticket,
             'type': order_type,
-            'symbol': signal['symbol'],
+            'symbol': symbol,
             'volume': lot_size,
             'entry_price': entry,
             'stop_loss': sl,
