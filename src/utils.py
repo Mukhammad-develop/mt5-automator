@@ -151,8 +151,9 @@ def _load_config_from_env() -> Dict[str, Any]:
             'num_positions': int(os.getenv('NUM_POSITIONS', '3')),
             'default_symbol': os.getenv('DEFAULT_SYMBOL', 'XAUUSD'),
             'symbol_mapping': symbol_mapping,
-            'breakeven_trigger': 'middle_entry',
-            'breakeven_offset': 0.1
+            'breakeven_enabled': os.getenv('BREAKEVEN_ENABLED', 'false').lower() == 'true',
+            'breakeven_trigger': os.getenv('BREAKEVEN_TRIGGER', 'middle_entry'),
+            'breakeven_offset': float(os.getenv('BREAKEVEN_OFFSET', '5.0'))
         },
         'ocr': {
             'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',

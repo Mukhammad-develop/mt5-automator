@@ -27,8 +27,9 @@ class PositionTracker:
         self.mt5_engine = mt5_engine
         
         # Breakeven settings
+        self.breakeven_enabled = self.trading_config.get('breakeven_enabled', False)
         self.breakeven_trigger = self.trading_config.get('breakeven_trigger', 'middle_entry')
-        self.breakeven_offset = self.trading_config.get('breakeven_offset', 0.1)
+        self.breakeven_offset = self.trading_config.get('breakeven_offset', 5.0)
         
         # Track positions that have been moved to breakeven
         self.breakeven_positions: Set[int] = set()
@@ -36,7 +37,10 @@ class PositionTracker:
         # Track active signals
         self.active_signals: Dict[str, Dict[str, Any]] = {}
         
-        self.logger.info(f"PositionTracker initialized: BE trigger={self.breakeven_trigger}, offset={self.breakeven_offset}")
+        if self.breakeven_enabled:
+            self.logger.info(f"PositionTracker initialized: BE enabled, trigger={self.breakeven_trigger}, offset={self.breakeven_offset}")
+        else:
+            self.logger.info("PositionTracker initialized: Breakeven DISABLED")
     
     def register_signal(self, signal_id: str, signal: Dict[str, Any]):
         """
@@ -150,6 +154,10 @@ class PositionTracker:
             direction: Trade direction (BUY/SELL)
         """
         try:
+            # Skip if breakeven is disabled
+            if not self.breakeven_enabled:
+                return
+            
             ticket = position['ticket']
             
             # Skip if already at breakeven
@@ -171,10 +179,30 @@ class PositionTracker:
                 # For BUY, price should go above middle entry + offset
                 if current_price >= trigger_price + self.breakeven_offset:
                     price_reached_trigger = True
+                    self.logger.info(f"BE trigger reached for #{ticket}: current={current_price}, trigger={trigger_price}, offset={self.breakeven_offset}")
             else:  # SELL
                 # For SELL, price should go below middle entry - offset
                 if current_price <= trigger_price - self.breakeven_offset:
                     price_reached_trigger = True
+                    self.logger.info(f"BE trigger reached for #{ticket}: current={current_price}, trigger={trigger_price}, offset={self.breakeven_offset}")
+            
+            # Additional check: Only move if position is actually in profit
+            if price_reached_trigger:
+                entry_price = position['open_price']
+                is_in_profit = False
+                
+                if direction == 'BUY':
+                    # For BUY, current price should be above entry
+                    if current_price > entry_price + self.breakeven_offset:
+                        is_in_profit = True
+                else:  # SELL
+                    # For SELL, current price should be below entry
+                    if current_price < entry_price - self.breakeven_offset:
+                        is_in_profit = True
+                
+                if not is_in_profit:
+                    self.logger.debug(f"Position #{ticket} not in enough profit yet for BE: entry={entry_price}, current={current_price}")
+                    return
             
             if price_reached_trigger:
                 # Move SL to breakeven (entry price + small offset for commission)

@@ -1,0 +1,108 @@
+================================================
+   ✅ BREAKEVEN LOGIC FIXED
+================================================
+
+PROBLEM: SL was moving to breakeven IMMEDIATELY
+================================================
+Your client reported that TP1 was set correctly to 4230 (or 2652.30 for gold),
+but the SL was moved to breakeven right away instead of waiting for the trigger.
+
+
+ROOT CAUSES FOUND:
+==================
+1. ❌ Breakeven offset was TOO SMALL (0.1 = 10 cents for gold ~$2650)
+2. ❌ No check if position was actually in profit
+3. ❌ Breakeven was ALWAYS enabled (should be optional)
+
+
+FIXES APPLIED:
+==============
+1. ✅ Breakeven now DISABLED by default
+2. ✅ Increased default offset from 0.1 to 5.0 ($5 for gold)
+3. ✅ Added profit check before moving to BE
+4. ✅ Added detailed logging to see exactly when BE triggers
+5. ✅ Made breakeven fully configurable in config.env
+
+
+NEW SETTINGS IN config.env:
+============================
+BREAKEVEN_ENABLED=false         # Set to true to enable (disabled by default)
+BREAKEVEN_TRIGGER=middle_entry  # When to check: middle_entry or lower_entry
+BREAKEVEN_OFFSET=5.0            # How far past trigger ($5 for XAUUSD)
+
+
+HOW IT WORKS NOW (When enabled):
+=================================
+For BUY signal:
+1. Order placed at entry with original SL
+2. Price goes up to middle entry + $5.00
+3. Bot checks: Is position in profit? (current > entry + $5)
+4. If YES → Move SL to entry + $0.10 (breakeven)
+5. If NO → Keep original SL
+
+For SELL signal:
+1. Order placed at entry with original SL
+2. Price goes down to middle entry - $5.00
+3. Bot checks: Is position in profit? (current < entry - $5)
+4. If YES → Move SL to entry - $0.10 (breakeven)
+5. If NO → Keep original SL
+
+
+EXAMPLE:
+========
+Signal: BUY XAUUSD
+Entry: 2650.00
+Middle: 2649.00
+SL: 2645.00
+TP1: 2655.00
+
+BEFORE FIX (WRONG):
+- Order placed → SL immediately moved to 2650.10 (breakeven)
+- Original SL (2645.00) lost!
+
+AFTER FIX (CORRECT):
+- Order placed → SL stays at 2645.00 ✅
+- Price reaches 2654.00 (middle + $5)
+- Bot checks: In profit? Yes! (2654 > 2650 + 5)
+- Bot moves SL to 2650.10 (breakeven) ✅
+- Now trading risk-free!
+
+
+RECOMMENDATION FOR YOUR CLIENT:
+================================
+Tell them to set in config.env:
+
+BREAKEVEN_ENABLED=false
+
+This disables breakeven completely until they understand how it works.
+They can manually manage breakeven in MT5 if they want.
+
+Later, if they want automatic breakeven:
+
+BREAKEVEN_ENABLED=true
+BREAKEVEN_OFFSET=10.0   # Adjust based on their strategy
+
+
+WHAT THEY'LL SEE IN LOGS:
+==========================
+With breakeven DISABLED:
+  2025-12-08 10:30:45 [INFO] PositionTracker initialized: Breakeven DISABLED
+
+With breakeven ENABLED:
+  2025-12-08 10:30:45 [INFO] PositionTracker initialized: BE enabled, trigger=middle_entry, offset=5.0
+  2025-12-08 10:31:15 [INFO] BE trigger reached for #123456: current=2654.0, trigger=2649.0, offset=5.0
+  2025-12-08 10:31:15 [INFO] Moved position #123456 to breakeven: SL=2650.10
+
+
+SUMMARY:
+========
+✅ Breakeven disabled by default
+✅ Won't move SL immediately anymore
+✅ Original TP/SL levels respected
+✅ Fully configurable for advanced users
+✅ Better logging to see what's happening
+
+
+The bot will now trade EXACTLY as the signal says!
+No automatic modifications unless explicitly enabled!
+
