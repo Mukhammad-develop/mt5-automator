@@ -48,6 +48,50 @@ Version history and roadmap.
 
 ---
 
+## 🛠️ Setup Guides (Text Files)
+
+### [START_HERE.txt](START_HERE.txt) ⚡ **Ultra-Simple**
+3-step quickstart for non-technical users.
+- Minimal instructions
+- Copy-paste commands
+- Windows-focused
+
+### [SIMPLE_SETUP.txt](SIMPLE_SETUP.txt)
+Super simple guide with Q&A.
+- One-file config (config.env)
+- Common questions answered
+- Beginner-friendly
+
+### [WINDOWS_SETUP.txt](WINDOWS_SETUP.txt)
+Detailed Windows installation.
+- Step-by-step setup
+- All prerequisites
+- Troubleshooting section
+
+---
+
+## 🐛 Fix & Troubleshooting Guides
+
+### [AUTO_SYMBOL_DETECTION.txt](AUTO_SYMBOL_DETECTION.txt)
+How automatic symbol resolution works.
+- Detects broker-specific symbols
+- Works for all pairs automatically
+- XAUUSD → XAUUSD+, etc.
+
+### [FIX_XAUUSD_PLUS.txt](FIX_XAUUSD_PLUS.txt)
+Manual symbol mapping guide.
+- For custom broker symbols
+- How to configure SYMBOL_MAPPING
+- Examples for different brokers
+
+### [BREAKEVEN_FIX.txt](BREAKEVEN_FIX.txt)
+Breakeven logic explained.
+- Why it was moving SL immediately
+- How the fix works
+- Configuration options
+
+---
+
 ## 📋 Quick Reference
 
 ### Installation Commands
@@ -66,8 +110,8 @@ python main.py  # Real trading
 
 ### Configuration Files
 
-- `../config/config.yaml` - Main configuration
-- `../.env` - API keys and credentials (create from .env.example)
+- `../config.env` - ONE config file for everything (recommended)
+- `../config/config.yaml` - Advanced YAML config (optional)
 
 ### Key Settings
 
@@ -172,12 +216,26 @@ trading:
 ```
 docs/
 ├── INDEX.md (this file)          # Documentation index
-├── WINDOWS_QUICKSTART.md ⭐      # Windows production guide (RECOMMENDED)
-├── QUICKSTART.md                 # General setup (both platforms)
-├── AI_INTEGRATION.md             # AI features & vision
-├── PLATFORM_GUIDES.md            # Platform-specific details
-├── PROJECT_SUMMARY.md            # Technical specifications
-└── CHANGELOG.md                  # Version history
+│
+├── 🚀 Getting Started (Markdown)
+│   ├── WINDOWS_QUICKSTART.md ⭐  # Windows production (RECOMMENDED)
+│   └── QUICKSTART.md             # General setup (both platforms)
+│
+├── 📖 Core Documentation (Markdown)
+│   ├── AI_INTEGRATION.md         # AI features & vision
+│   ├── PLATFORM_GUIDES.md        # Platform-specific details
+│   ├── PROJECT_SUMMARY.md        # Technical specifications
+│   └── CHANGELOG.md              # Version history
+│
+├── 🛠️ Setup Guides (Text)
+│   ├── START_HERE.txt ⚡         # Ultra-simple 3-step guide
+│   ├── SIMPLE_SETUP.txt          # Simple with Q&A
+│   └── WINDOWS_SETUP.txt         # Detailed Windows setup
+│
+└── 🐛 Fix Guides (Text)
+    ├── AUTO_SYMBOL_DETECTION.txt # Automatic symbol resolver
+    ├── FIX_XAUUSD_PLUS.txt       # Manual symbol mapping
+    └── BREAKEVEN_FIX.txt         # Breakeven logic fix
 ```
 
 ---
