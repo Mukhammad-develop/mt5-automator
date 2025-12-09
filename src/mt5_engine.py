@@ -281,9 +281,12 @@ class MT5Engine:
                         self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at {entry_price} (current: {current_price})")
                         return None
                 else:  # SELL
-                    # For SELL: only place LIMIT if current price is ABOVE entry
-                    if current_price <= entry_price:
-                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at {entry_price} (current: {current_price})")
+                    # For SELL: only place LIMIT if current price is BELOW entry
+                    # SELL LIMIT: sell at entry_price when price goes UP to it
+                    # If current_price < entry_price: We CAN place SELL LIMIT (price will rise to entry)
+                    # If current_price >= entry_price: Price already at or above entry, SKIP (don't place market order)
+                    if current_price >= entry_price:
+                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at/passed {entry_price} (current: {current_price})")
                         return None
             
             # Determine order type

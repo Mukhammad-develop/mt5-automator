@@ -203,7 +203,13 @@ class TP2Protection:
                             self.deactivate_protection(signal_id)
                         continue
                     
-                    # Check if TP2 has been hit
+                    # Only check TP2 if there are actual open positions
+                    # Don't activate protection if no positions exist (prevents false triggers)
+                    positions = self.mt5_engine.get_positions_by_signal(signal_id)
+                    if not positions:
+                        continue  # No positions, skip TP2 check
+                    
+                    # Check if TP2 has been hit (only if positions exist)
                     if self.position_tracker.check_tp_hit(signal_id, tp_level=2):
                         self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
                 

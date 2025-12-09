@@ -155,9 +155,12 @@ class DryRunMT5Engine:
                     self.logger.warning(f"⚠️ (DRY-RUN) Staged Entry: Skipping Position {position_num} - price already at {entry} (current: {current_price})")
                     return None
             else:  # SELL
-                # For SELL: only place LIMIT if current price is ABOVE entry
-                if current_price <= entry:
-                    self.logger.warning(f"⚠️ (DRY-RUN) Staged Entry: Skipping Position {position_num} - price already at {entry} (current: {current_price})")
+                # For SELL: only place LIMIT if current price is BELOW entry
+                # SELL LIMIT: sell at entry when price goes UP to it
+                # If current_price < entry: We CAN place SELL LIMIT (price will rise to entry)
+                # If current_price >= entry: Price already at or above entry, SKIP
+                if current_price >= entry:
+                    self.logger.warning(f"⚠️ (DRY-RUN) Staged Entry: Skipping Position {position_num} - price already at/passed {entry} (current: {current_price})")
                     return None
         
         if direction == 'BUY':
