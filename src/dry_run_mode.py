@@ -170,7 +170,10 @@ class DryRunMT5Engine:
                 order_type = "BUY MARKET"
                 entry = current_price
         else:  # SELL
-            if current_price > entry:
+            # For SELL LIMIT: sell at entry when price goes UP to it
+            # If current_price < entry: Place SELL LIMIT (price will rise to entry)
+            # If current_price >= entry: Place SELL MARKET (price already at/passed entry)
+            if current_price < entry:
                 order_type = "SELL LIMIT"
             else:
                 order_type = "SELL MARKET"

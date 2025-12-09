@@ -299,7 +299,10 @@ class MT5Engine:
                     action = "BUY MARKET"
                     entry_price = current_price
             else:  # SELL
-                if current_price > entry_price:
+                # For SELL LIMIT: sell at entry_price when price goes UP to it
+                # If current_price < entry_price: Place SELL LIMIT (price will rise to entry)
+                # If current_price >= entry_price: Place SELL MARKET (price already at/passed entry)
+                if current_price < entry_price:
                     order_type = mt5.ORDER_TYPE_SELL_LIMIT
                     action = "SELL LIMIT"
                 else:

@@ -359,6 +359,17 @@ JSON:"""
             # Calculate middle entry
             entry_upper = float(data['entry_upper'])
             entry_lower = float(data['entry_lower'])
+            
+            # If entry range is the same (single entry price), create a spread for staged entry
+            # This ensures 3 positions are placed at different levels (upper, middle, lower)
+            if entry_upper == entry_lower:
+                # Create a spread: for gold, use ~2 pips (0.2) spread
+                # For other pairs, adjust based on typical pip size
+                spread = 0.2  # Default 2 pips for gold
+                entry_upper = entry_upper + spread / 2  # Upper entry
+                entry_lower = entry_lower - spread / 2  # Lower entry
+                self.logger.info(f"Single entry price detected - created spread: {entry_lower:.2f} - {entry_upper:.2f}")
+            
             entry_middle = (entry_upper + entry_lower) / 2
             
             # Build signal
