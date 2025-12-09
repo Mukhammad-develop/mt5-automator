@@ -2,6 +2,7 @@
 Utility functions for MT5 Trading Automator
 """
 import os
+import sys
 import json
 import logging
 import hashlib
@@ -9,6 +10,58 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 import yaml
 from dotenv import load_dotenv
+import re
+
+
+class SafeConsoleHandler(logging.StreamHandler):
+    """
+    Console handler that safely handles Unicode characters on Windows.
+    Strips emojis from console output but keeps them in file logs.
+    """
+    
+    # Common emoji patterns
+    EMOJI_PATTERN = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        "\U00002702-\U000027B0"  # dingbats
+        "\U000024C2-\U0001F251"  # enclosed characters
+        "]+",
+        flags=re.UNICODE
+    )
+    
+    def emit(self, record):
+        """
+        Emit a record, stripping emojis for console output
+        """
+        try:
+            # Get the formatted message
+            msg = self.format(record)
+            
+            # Strip emojis for console (Windows compatibility)
+            if sys.platform == 'win32':
+                msg = self.EMOJI_PATTERN.sub('', msg).strip()
+            
+            # Try to write with UTF-8 encoding
+            stream = self.stream
+            if hasattr(stream, 'buffer'):
+                # For sys.stdout/sys.stderr, use the underlying buffer
+                stream.buffer.write((msg + self.terminator).encode('utf-8', errors='replace'))
+                stream.buffer.flush()
+            else:
+                # Fallback to regular write with error handling
+                try:
+                    stream.write(msg + self.terminator)
+                    self.flush()
+                except UnicodeEncodeError:
+                    # If encoding fails, replace problematic characters
+                    safe_msg = msg.encode('ascii', errors='replace').decode('ascii')
+                    stream.write(safe_msg + self.terminator)
+                    self.flush()
+        except Exception:
+            self.handleError(record)
 
 
 def setup_logging(config: Dict[str, Any]) -> logging.Logger:
@@ -30,6 +83,18 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
     # Create logs directory if it doesn't exist
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
     
+    # Set UTF-8 encoding for Windows console
+    if sys.platform == 'win32':
+        try:
+            # Try to set console output to UTF-8
+            import codecs
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            if hasattr(sys.stderr, 'reconfigure'):
+                sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass  # If it fails, the SafeConsoleHandler will handle it
+    
     # Create logger
     logger = logging.getLogger('MT5Automator')
     logger.setLevel(log_level)
@@ -37,17 +102,18 @@ def setup_logging(config: Dict[str, Any]) -> logging.Logger:
     # Remove existing handlers
     logger.handlers = []
     
-    # File handler with rotation
+    # File handler with rotation (UTF-8 encoding)
     from logging.handlers import RotatingFileHandler
     file_handler = RotatingFileHandler(
         log_file,
         maxBytes=max_bytes,
-        backupCount=backup_count
+        backupCount=backup_count,
+        encoding='utf-8'
     )
     file_handler.setLevel(log_level)
     
-    # Console handler (can be different level than file)
-    console_handler = logging.StreamHandler()
+    # Console handler with safe Unicode handling
+    console_handler = SafeConsoleHandler(sys.stdout)
     console_level = getattr(logging, log_config.get('console_level', 'WARNING'))
     console_handler.setLevel(console_level)
     
