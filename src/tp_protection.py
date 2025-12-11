@@ -203,15 +203,18 @@ class TP2Protection:
                             self.deactivate_protection(signal_id)
                         continue
                     
-                    # Only check TP2 if there are actual open positions
-                    # Don't activate protection if no positions exist (prevents false triggers)
-                    positions = self.mt5_engine.get_positions_by_signal(signal_id)
-                    if not positions:
-                        continue  # No positions, skip TP2 check
-                    
-                    # Check if TP2 has been hit (only if positions exist)
+                    # Check if TP2 has been hit (even if no positions exist yet)
+                    # This handles case where market reaches TP2 before any positions open
+                    # In that case, we should cancel all pending LIMIT orders
                     if self.position_tracker.check_tp_hit(signal_id, tp_level=2):
-                        self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
+                        # Check if there are pending orders to cancel
+                        pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
+                        positions = self.mt5_engine.get_positions_by_signal(signal_id)
+                        
+                        # Only activate protection if there are pending orders OR open positions
+                        # This prevents false triggers when signal is already completed
+                        if pending_orders or positions:
+                            self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
                 
             except Exception as e:
                 self.logger.error(f"Error in TP2 monitoring loop: {e}", exc_info=True)

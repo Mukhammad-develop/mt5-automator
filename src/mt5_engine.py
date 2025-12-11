@@ -247,11 +247,13 @@ class MT5Engine:
                     tp = signal.get('tp1')
             elif position_num == 2:
                 entry_price = signal['entry_middle']
-                sl = signal.get('sl2')
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
                 tp = signal.get('tp2')
             elif position_num == 3:
                 entry_price = signal['entry_lower']
-                sl = signal.get('sl3') or signal.get('sl2')
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
                 
                 # Position 3 "Runner" Strategy
                 if position_3_runner_enabled:
@@ -273,21 +275,22 @@ class MT5Engine:
             
             # STAGED ENTRY LOGIC: Prevents all 3 positions from filling at once
             # Only place LIMIT orders at prices that haven't been touched yet
+            # If price has passed entry, allow MARKET order (client requirement)
             if staged_entry_enabled:
                 if direction == 'BUY':
                     # For BUY: only place LIMIT if current price is BELOW entry
-                    # If price already passed this entry, SKIP it (don't place market order)
+                    # If price already passed this entry, allow MARKET order (don't skip)
                     if current_price >= entry_price:
-                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at {entry_price} (current: {current_price})")
-                        return None
+                        # Price passed entry - will place MARKET order below
+                        self.logger.info(f"Staged Entry: Price passed entry {entry_price} (current: {current_price}) - will place MARKET order")
                 else:  # SELL
                     # For SELL: only place LIMIT if current price is BELOW entry
                     # SELL LIMIT: sell at entry_price when price goes UP to it
                     # If current_price < entry_price: We CAN place SELL LIMIT (price will rise to entry)
-                    # If current_price >= entry_price: Price already at or above entry, SKIP (don't place market order)
+                    # If current_price >= entry_price: Price already at or above entry, allow MARKET order (don't skip)
                     if current_price >= entry_price:
-                        self.logger.warning(f"⚠️ Staged Entry: Skipping Position {position_num} - price already at/passed {entry_price} (current: {current_price})")
-                        return None
+                        # Price passed entry - will place MARKET order below
+                        self.logger.info(f"Staged Entry: Price passed entry {entry_price} (current: {current_price}) - will place MARKET order")
             
             # Determine order type
             if direction == 'BUY':
