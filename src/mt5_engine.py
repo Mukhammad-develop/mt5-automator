@@ -324,33 +324,62 @@ class MT5Engine:
                         # Price passed entry - will place MARKET order below
                         self.logger.info(f"Staged Entry: Price passed entry {entry_price} (current: {current_price}) - will place MARKET order")
             
-            # Determine order type
+            # Get symbol info for stop level validation
+            symbol_info = mt5.symbol_info(symbol)
+            if symbol_info is None:
+                self.logger.error(f"Cannot get symbol info for {symbol}")
+                return None
+            
+            # Get stop level (minimum distance from current price for limit orders)
+            stop_level = symbol_info.trade_stops_level * symbol_info.point
+            if stop_level == 0:
+                stop_level = symbol_info.point * 10  # Default to 10 points if not specified
+            
+            # Determine order type with stop level validation
             if direction == 'BUY':
+                # For BUY LIMIT: price must be BELOW current ASK by at least stop_level
                 if current_price < entry_price:
-                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
-                    action = "BUY LIMIT"
+                    # Check if entry_price meets minimum distance requirement
+                    min_limit_price = current_price - stop_level
+                    if entry_price >= min_limit_price:
+                        # Entry price too close to current price - use MARKET instead
+                        self.logger.warning(f"BUY LIMIT price {entry_price} too close to current {current_price} (min distance: {stop_level:.2f}) - using MARKET order")
+                        order_type = mt5.ORDER_TYPE_BUY
+                        action = "BUY MARKET"
+                        entry_price = current_price
+                    else:
+                        order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                        action = "BUY LIMIT"
                 else:
                     order_type = mt5.ORDER_TYPE_BUY
                     action = "BUY MARKET"
                     entry_price = current_price
             else:  # SELL
-                # For SELL LIMIT: sell at entry_price when price goes UP to it
-                # If current_price < entry_price: Place SELL LIMIT (price will rise to entry)
-                # If current_price >= entry_price: Place SELL MARKET (price already at/passed entry)
-                if current_price < entry_price:
-                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
-                    action = "SELL LIMIT"
+                # For SELL LIMIT: price must be ABOVE current BID by at least stop_level
+                # Get BID price for SELL orders
+                current_bid = self.get_current_price(symbol, 'bid')
+                if current_bid is None:
+                    current_bid = current_price  # Fallback to ask if bid unavailable
+                
+                if current_bid < entry_price:
+                    # Check if entry_price meets minimum distance requirement
+                    min_limit_price = current_bid + stop_level
+                    if entry_price <= min_limit_price:
+                        # Entry price too close to current price - use MARKET instead
+                        self.logger.warning(f"SELL LIMIT price {entry_price} too close to current {current_bid} (min distance: {stop_level:.2f}) - using MARKET order")
+                        order_type = mt5.ORDER_TYPE_SELL
+                        action = "SELL MARKET"
+                        entry_price = current_bid
+                    else:
+                        order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                        action = "SELL LIMIT"
                 else:
                     order_type = mt5.ORDER_TYPE_SELL
                     action = "SELL MARKET"
-                    entry_price = current_price
+                    entry_price = current_bid
             
             # Prepare request
-            # Get symbol info to determine correct filling type
-            symbol_info = mt5.symbol_info(symbol)
-            if symbol_info is None:
-                self.logger.error(f"Cannot get symbol info for {symbol}")
-                return None
+            # Symbol info already retrieved above for stop level validation
             
             # Determine filling type (use RETURN for compatibility, fallback to FOK)
             filling_type = symbol_info.filling_mode
