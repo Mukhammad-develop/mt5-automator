@@ -236,32 +236,64 @@ class MT5Engine:
             position_3_runner_enabled = trading_config.get('position_3_runner_enabled', True)
             
             # Determine entry price and SL/TP based on position number
-            if position_num == 1:
-                entry_price = signal['entry_upper']
-                sl = signal.get('sl1')
-                # Configurable TP for Position 1
-                if position_1_tp_setting == 'TP2':
+            # IMPORTANT: For SELL orders, positions are REVERSED (closest entry closes first)
+            # For BUY orders, positions are NORMAL (closest entry closes first)
+            if direction == 'SELL':
+                # SELL: Position 1 = entry_lower (closest, closes at TP1), Position 3 = entry_upper (farthest, runner)
+                if position_num == 1:
+                    entry_price = signal['entry_lower']  # Closest entry for SELL
+                    sl = signal.get('sl1')
+                    # Configurable TP for Position 1
+                    if position_1_tp_setting == 'TP2':
+                        tp = signal.get('tp2')
+                        self.logger.info(f"Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+                    else:
+                        tp = signal.get('tp1')
+                elif position_num == 2:
+                    entry_price = signal['entry_middle']
+                    # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                    sl = signal.get('sl1')
                     tp = signal.get('tp2')
-                    self.logger.info(f"Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
-                else:
-                    tp = signal.get('tp1')
-            elif position_num == 2:
-                entry_price = signal['entry_middle']
-                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
-                sl = signal.get('sl1')
-                tp = signal.get('tp2')
-            elif position_num == 3:
-                entry_price = signal['entry_lower']
-                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
-                sl = signal.get('sl1')
-                
-                # Position 3 "Runner" Strategy
-                if position_3_runner_enabled:
-                    # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
-                    tp = None
-                    self.logger.info(f"🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
-                else:
+                elif position_num == 3:
+                    entry_price = signal['entry_upper']  # Farthest entry for SELL (runner)
+                    # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                    sl = signal.get('sl1')
+                    
+                    # Position 3 "Runner" Strategy
+                    if position_3_runner_enabled:
+                        # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
+                        tp = None
+                        self.logger.info(f"🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
+                    else:
+                        tp = signal.get('tp2')
+            else:  # BUY
+                # BUY: Position 1 = entry_upper (closest, closes at TP1), Position 3 = entry_lower (farthest, runner)
+                if position_num == 1:
+                    entry_price = signal['entry_upper']  # Closest entry for BUY
+                    sl = signal.get('sl1')
+                    # Configurable TP for Position 1
+                    if position_1_tp_setting == 'TP2':
+                        tp = signal.get('tp2')
+                        self.logger.info(f"Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+                    else:
+                        tp = signal.get('tp1')
+                elif position_num == 2:
+                    entry_price = signal['entry_middle']
+                    # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                    sl = signal.get('sl1')
                     tp = signal.get('tp2')
+                elif position_num == 3:
+                    entry_price = signal['entry_lower']  # Farthest entry for BUY (runner)
+                    # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                    sl = signal.get('sl1')
+                    
+                    # Position 3 "Runner" Strategy
+                    if position_3_runner_enabled:
+                        # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
+                        tp = None
+                        self.logger.info(f"🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
+                    else:
+                        tp = signal.get('tp2')
             else:
                 self.logger.error(f"Invalid position number: {position_num}")
                 return None
@@ -514,6 +546,49 @@ class MT5Engine:
         except Exception as e:
             self.logger.error(f"Error cancelling order: {e}")
             return False
+    
+    def get_positions_by_direction(self, symbol: str, direction: str) -> List[Dict[str, Any]]:
+        """
+        Get all open positions for a symbol in a specific direction
+        
+        Args:
+            symbol: Trading symbol
+            direction: 'BUY' or 'SELL'
+            
+        Returns:
+            List of position dictionaries
+        """
+        try:
+            # Map symbol to broker-specific name
+            symbol = self.map_symbol(symbol)
+            
+            positions = mt5.positions_get(symbol=symbol)
+            if positions is None:
+                return []
+            
+            direction_positions = []
+            for pos in positions:
+                # Check position type
+                pos_direction = 'BUY' if pos.type == mt5.ORDER_TYPE_BUY else 'SELL'
+                if pos_direction == direction:
+                    direction_positions.append({
+                        'ticket': pos.ticket,
+                        'symbol': pos.symbol,
+                        'type': pos.type,
+                        'volume': pos.volume,
+                        'open_price': pos.price_open,
+                        'current_price': pos.price_current,
+                        'sl': pos.sl,
+                        'tp': pos.tp,
+                        'profit': pos.profit,
+                        'comment': pos.comment
+                    })
+            
+            return direction_positions
+            
+        except Exception as e:
+            self.logger.error(f"Error getting positions by direction: {e}")
+            return []
     
     def get_positions_by_signal(self, signal_id: str) -> List[Dict[str, Any]]:
         """

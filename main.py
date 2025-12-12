@@ -250,6 +250,14 @@ class MT5Automator:
                 self.logger.warning(f"⚠️ Signal {signal_id} is protected by TP2 - SKIPPING")
                 return
             
+            # Check for opposite direction positions (don't place BUY if SELL open, and vice versa)
+            opposite_positions = self.mt5_engine.get_positions_by_direction(signal['symbol'], 
+                                                                             'BUY' if signal['direction'] == 'SELL' else 'SELL')
+            if opposite_positions:
+                self.logger.warning(f"⚠️ Cannot place {signal['direction']} orders: {len(opposite_positions)} {('BUY' if signal['direction'] == 'SELL' else 'SELL')} position(s) still open for {signal['symbol']}")
+                self.logger.warning(f"⚠️ Close existing positions first before placing new {signal['direction']} orders")
+                return
+            
             # Save signal to database
             save_signal_to_db(signal)
             

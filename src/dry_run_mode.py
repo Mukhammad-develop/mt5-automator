@@ -116,37 +116,69 @@ class DryRunMT5Engine:
         staged_entry_enabled = self.trading_config.get('staged_entry_enabled', True)
         position_3_runner_enabled = self.trading_config.get('position_3_runner_enabled', True)
         
-        # Determine entry and SL/TP
-        if position_num == 1:
-            entry = signal['entry_upper']
-            sl = signal.get('sl1')
-            # Configurable TP for Position 1
-            if position_1_tp_setting == 'TP2':
+        # Determine entry and SL/TP based on position number
+        # IMPORTANT: For SELL orders, positions are REVERSED (closest entry closes first)
+        # For BUY orders, positions are NORMAL (closest entry closes first)
+        direction = signal['direction']
+        if direction == 'SELL':
+            # SELL: Position 1 = entry_lower (closest, closes at TP1), Position 3 = entry_upper (farthest, runner)
+            if position_num == 1:
+                entry = signal['entry_lower']  # Closest entry for SELL
+                sl = signal.get('sl1')
+                # Configurable TP for Position 1
+                if position_1_tp_setting == 'TP2':
+                    tp = signal.get('tp2')
+                    self.logger.info(f"(DRY-RUN) Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+                else:
+                    tp = signal.get('tp1')
+            elif position_num == 2:
+                entry = signal['entry_middle']
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
                 tp = signal.get('tp2')
-                self.logger.info(f"(DRY-RUN) Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
-            else:
-                tp = signal.get('tp1')
-        elif position_num == 2:
-            entry = signal['entry_middle']
-            # Use SL1 for all positions (client requirement: "set a fixed SL for all")
-            sl = signal.get('sl1')
-            tp = signal.get('tp2')
-        else:
-            entry = signal['entry_lower']
-            # Use SL1 for all positions (client requirement: "set a fixed SL for all")
-            sl = signal.get('sl1')
-            
-            # Position 3 "Runner" Strategy
-            if position_3_runner_enabled:
-                # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
-                tp = None
-                self.logger.info(f"(DRY-RUN) 🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
-            else:
+            elif position_num == 3:
+                entry = signal['entry_upper']  # Farthest entry for SELL (runner)
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
+                
+                # Position 3 "Runner" Strategy
+                if position_3_runner_enabled:
+                    # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
+                    tp = None
+                    self.logger.info(f"(DRY-RUN) 🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
+                else:
+                    tp = signal.get('tp2')
+        else:  # BUY
+            # BUY: Position 1 = entry_upper (closest, closes at TP1), Position 3 = entry_lower (farthest, runner)
+            if position_num == 1:
+                entry = signal['entry_upper']  # Closest entry for BUY
+                sl = signal.get('sl1')
+                # Configurable TP for Position 1
+                if position_1_tp_setting == 'TP2':
+                    tp = signal.get('tp2')
+                    self.logger.info(f"(DRY-RUN) Position 1 targeting TP2 (configured: POSITION_1_TP=TP2)")
+                else:
+                    tp = signal.get('tp1')
+            elif position_num == 2:
+                entry = signal['entry_middle']
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
                 tp = signal.get('tp2')
+            elif position_num == 3:
+                entry = signal['entry_lower']  # Farthest entry for BUY (runner)
+                # Use SL1 for all positions (client requirement: "set a fixed SL for all")
+                sl = signal.get('sl1')
+                
+                # Position 3 "Runner" Strategy
+                if position_3_runner_enabled:
+                    # Position 3 is a "runner" - no TP, will use trailing stop after TP2 reached
+                    tp = None
+                    self.logger.info(f"(DRY-RUN) 🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
+                else:
+                    tp = signal.get('tp2')
         
         # Determine order type
         current_price = self.get_current_price(symbol)
-        direction = signal['direction']
         
         # STAGED ENTRY LOGIC: Prevents all 3 positions from filling at once
         # Only place LIMIT orders at prices that haven't been touched yet
