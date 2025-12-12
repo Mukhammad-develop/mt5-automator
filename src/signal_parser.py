@@ -160,9 +160,17 @@ class SignalParser:
             price2 = float(match.group(2))
             return (max(price1, price2), min(price1, price2))
         
-        # Pattern 3: Two prices on same line after BUY/SELL
-        pattern3 = r'(?:BUY|SELL).*?(\d+\.?\d+).*?(\d+\.?\d+)'
+        # Pattern 3: "@price1 price2" format (e.g., "@4218 4220")
+        pattern3 = r'@\s*(\d+\.?\d*)\s+(\d+\.?\d*)'
         match = re.search(pattern3, text, re.IGNORECASE)
+        if match:
+            price1 = float(match.group(1))
+            price2 = float(match.group(2))
+            return (max(price1, price2), min(price1, price2))
+        
+        # Pattern 4: Two prices on same line after BUY/SELL
+        pattern4 = r'(?:BUY|SELL).*?(\d+\.?\d+).*?(\d+\.?\d+)'
+        match = re.search(pattern4, text, re.IGNORECASE)
         if match:
             price1 = float(match.group(1))
             price2 = float(match.group(2))

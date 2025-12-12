@@ -159,10 +159,13 @@ Extract and return ONLY a JSON object with these fields (no other text):
 Rules:
 - Ignore emojis, formatting, decorations
 - "Long" or "Buy" = BUY, "Short" or "Sell" = SELL
-- Entry can be called: Entry, Zone, Price, etc.
+- Entry can be called: Entry, Zone, Price, @price1 price2, etc.
+- Examples: "@4218 4220" means entry range 4218-4220 (lower-upper for SELL, upper-lower for BUY)
 - TP can be called: TP, Target, Take Profit, etc.
 - SL can be called: SL, Stop, Stop Loss, etc.
 - If only one entry price given, use it for both upper and lower
+- For SELL: entry_upper should be higher price, entry_lower should be lower price
+- For BUY: entry_upper should be higher price, entry_lower should be lower price
 - Return null for missing values
 - Return ONLY valid JSON, no explanations
 

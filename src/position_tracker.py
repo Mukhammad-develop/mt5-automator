@@ -478,21 +478,27 @@ class PositionTracker:
             # Get current positions
             positions = self.mt5_engine.get_positions_by_signal(signal_id)
             
-            # Get current price
-            current_price = self.mt5_engine.get_current_price(signal['symbol'])
+            direction = signal['direction']
+            
+            # Get current price - use ASK for BUY, BID for SELL
+            # For BUY: we buy at ASK, so check ASK price
+            # For SELL: we sell at BID, so check BID price
+            if direction == 'BUY':
+                current_price = self.mt5_engine.get_current_price(signal['symbol'], 'ask')
+            else:  # SELL
+                current_price = self.mt5_engine.get_current_price(signal['symbol'], 'bid')
+            
             if current_price is None:
                 return False
             
-            direction = signal['direction']
-            
             # Check if TP reached
             if direction == 'BUY':
-                # For BUY, TP is above entry, check if price reached it
+                # For BUY, TP is above entry, check if ASK price reached it
                 if current_price >= tp_price:
                     self.logger.info(f"TP{tp_level} reached for signal {signal_id}: price={current_price}, tp={tp_price}")
                     return True
             else:  # SELL
-                # For SELL, TP is below entry, check if price reached it
+                # For SELL, TP is below entry, check if BID price reached it
                 if current_price <= tp_price:
                     self.logger.info(f"TP{tp_level} reached for signal {signal_id}: price={current_price}, tp={tp_price}")
                     return True
