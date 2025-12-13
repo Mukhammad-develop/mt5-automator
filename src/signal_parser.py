@@ -215,11 +215,11 @@ class SignalParser:
             Symbol or None
         """
         # Common forex and commodity symbols
-        # IMPORTANT: Check longer symbols first (BTCUSD before BTC) to avoid false matches
+        # IMPORTANT: Check longer symbols first (BTCUSD before BTC, BITCOIN USD before BITCOIN) to avoid false matches
         symbols = [
             'BTCUSD', 'XAUUSD', 'GOLD', 'GBPUSD', 'EURUSD', 'USDJPY', 'AUDUSD',
             'USDCAD', 'NZDUSD', 'USDCHF', 'EURJPY', 'GBPJPY', 'EURGBP',
-            'ETHUSD', 'XAGUSD', 'SILVER', 'BTC'  # BTC must be after BTCUSD
+            'ETHUSD', 'XAGUSD', 'SILVER', 'BITCOIN USD', 'BITCOIN/USD', 'BITCOIN', 'BTC'  # BTC and BITCOIN must be after BTCUSD
         ]
         
         text_upper = text.upper()
@@ -231,6 +231,8 @@ class SignalParser:
                 elif symbol == 'SILVER':
                     return 'XAGUSD'
                 elif symbol == 'BTC':  # Map BTC to BTCUSD
+                    return 'BTCUSD'
+                elif symbol == 'BITCOIN' or symbol == 'BITCOIN USD' or symbol == 'BITCOIN/USD':  # Map BITCOIN variations to BTCUSD
                     return 'BTCUSD'
                 return symbol
         

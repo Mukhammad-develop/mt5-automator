@@ -145,7 +145,7 @@ Message (may contain emojis, markdown, stickers text, or unusual formatting):
 Extract and return ONLY a JSON object with these fields (no other text):
 {{
   "direction": "BUY" or "SELL",
-  "symbol": "trading symbol (e.g. BTCUSD, XAUUSD, EURUSD)" or null if not found,
+  "symbol": "trading symbol (e.g. BTCUSD, bitcoin, XAUUSD, EURUSD)" or null if not found,
   "entry_upper": upper entry price as float,
   "entry_lower": lower entry price as float,
   "sl1": stop loss 1 as float or null,
@@ -375,11 +375,13 @@ JSON:"""
             
             entry_middle = (entry_upper + entry_lower) / 2
             
-            # Normalize symbol (map BTC to BTCUSD, GOLD to XAUUSD, etc.)
+            # Normalize symbol (map BTC/BITCOIN to BTCUSD, GOLD to XAUUSD, etc.)
             symbol = data.get('symbol')
             if symbol:
                 symbol = symbol.upper()
                 if symbol == 'BTC':
+                    symbol = 'BTCUSD'
+                elif symbol == 'BITCOIN' or symbol == 'BITCOIN USD' or symbol == 'BITCOIN/USD':
                     symbol = 'BTCUSD'
                 elif symbol == 'GOLD':
                     symbol = 'XAUUSD'
