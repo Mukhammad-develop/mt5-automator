@@ -327,74 +327,49 @@ class MT5Engine:
                         # Price passed entry - will place MARKET order below
                         self.logger.info(f"Staged Entry: Price passed entry {entry_price} (current: {current_price}) - will place MARKET order")
             
-            # Get symbol info for stop level validation
+            # Get symbol info for order filling type
             symbol_info = mt5.symbol_info(symbol)
             if symbol_info is None:
                 self.logger.error(f"Cannot get symbol info for {symbol}")
                 return None
             
-            # Get stop level (minimum distance from current price for limit orders)
-            stop_level = symbol_info.trade_stops_level * symbol_info.point
-            if stop_level == 0:
-                stop_level = symbol_info.point * 10  # Default to 10 points if not specified
-            
             # Store original entry price for tracking (before any modifications)
             original_entry_price = entry_price
             
             # CLIENT REQUIREMENT: Always place LIMIT orders at intended entry levels
-            # Even if price has passed, place LIMIT orders - they'll remain pending until price returns
+            # Even if price has passed or is close, place LIMIT orders - they'll remain pending until price reaches them
             # This ensures each position opens at its intended level (90130, 90094, 90058), not all at current price
+            # The broker will reject if invalid, but we don't preemptively convert to MARKET
             
-            # Determine order type with stop level validation
+            # Determine order type - ALWAYS use LIMIT orders at intended entry levels
             if direction == 'BUY':
-                # For BUY LIMIT: price must be BELOW current ASK by at least stop_level
-                if current_price < entry_price:
-                    # Check if entry_price meets minimum distance requirement
-                    min_limit_price = current_price - stop_level
-                    if entry_price >= min_limit_price:
-                        # Entry price too close to current price - use MARKET instead
-                        self.logger.warning(f"BUY LIMIT price {entry_price} too close to current {current_price} (min distance: {stop_level:.2f}) - using MARKET order")
-                        order_type = mt5.ORDER_TYPE_BUY
-                        action = "BUY MARKET"
-                        order_execution_price = current_price
-                    else:
-                        order_type = mt5.ORDER_TYPE_BUY_LIMIT
-                        action = "BUY LIMIT"
-                        order_execution_price = entry_price
+                # Always place BUY LIMIT at intended entry level
+                # If current_price < entry_price: LIMIT will wait for price to rise
+                # If current_price >= entry_price: LIMIT will wait for price to return down
+                order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                action = "BUY LIMIT"
+                order_execution_price = entry_price
+                if current_price >= entry_price:
+                    self.logger.info(f"Price {current_price} passed entry {entry_price} - placing LIMIT order (will fill when price returns to {entry_price})")
                 else:
-                    # Price has passed entry - STILL place LIMIT order at intended entry level
-                    # This ensures position opens at correct level (90130, 90094, 90058), not all at current price
-                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
-                    action = "BUY LIMIT"
-                    order_execution_price = entry_price
-                    self.logger.info(f"Price {current_price} passed entry {entry_price} - placing LIMIT order at intended entry (will fill when price returns)")
+                    self.logger.info(f"Placing BUY LIMIT at {entry_price} (current: {current_price})")
             else:  # SELL
-                # For SELL LIMIT: price must be ABOVE current BID by at least stop_level
-                # Get BID price for SELL orders
+                # Always place SELL LIMIT at intended entry level
+                # Get BID price for SELL orders (for logging only)
                 current_bid = self.get_current_price(symbol, 'bid')
                 if current_bid is None:
                     current_bid = current_price  # Fallback to ask if bid unavailable
                 
-                if current_bid < entry_price:
-                    # Check if entry_price meets minimum distance requirement
-                    min_limit_price = current_bid + stop_level
-                    if entry_price <= min_limit_price:
-                        # Entry price too close to current price - use MARKET instead
-                        self.logger.warning(f"SELL LIMIT price {entry_price} too close to current {current_bid} (min distance: {stop_level:.2f}) - using MARKET order")
-                        order_type = mt5.ORDER_TYPE_SELL
-                        action = "SELL MARKET"
-                        order_execution_price = current_bid
-                    else:
-                        order_type = mt5.ORDER_TYPE_SELL_LIMIT
-                        action = "SELL LIMIT"
-                        order_execution_price = entry_price
+                # Always place SELL LIMIT at intended entry level
+                # If current_bid < entry_price: LIMIT will wait for price to rise
+                # If current_bid >= entry_price: LIMIT will wait for price to return down
+                order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                action = "SELL LIMIT"
+                order_execution_price = entry_price
+                if current_bid >= entry_price:
+                    self.logger.info(f"Price {current_bid} passed entry {entry_price} - placing LIMIT order (will fill when price returns to {entry_price})")
                 else:
-                    # Price has passed entry - STILL place LIMIT order at intended entry level
-                    # This ensures position opens at correct level, not all at current price
-                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
-                    action = "SELL LIMIT"
-                    order_execution_price = entry_price
-                    self.logger.info(f"Price {current_bid} passed entry {entry_price} - placing LIMIT order at intended entry (will fill when price returns)")
+                    self.logger.info(f"Placing SELL LIMIT at {entry_price} (current: {current_bid})")
             
             # Prepare request
             # Symbol info already retrieved above for stop level validation
