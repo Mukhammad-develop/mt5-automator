@@ -341,6 +341,10 @@ class MT5Engine:
             # Store original entry price for tracking (before any modifications)
             original_entry_price = entry_price
             
+            # CLIENT REQUIREMENT: Always place LIMIT orders at intended entry levels
+            # Even if price has passed, place LIMIT orders - they'll remain pending until price returns
+            # This ensures each position opens at its intended level (90130, 90094, 90058), not all at current price
+            
             # Determine order type with stop level validation
             if direction == 'BUY':
                 # For BUY LIMIT: price must be BELOW current ASK by at least stop_level
@@ -352,18 +356,18 @@ class MT5Engine:
                         self.logger.warning(f"BUY LIMIT price {entry_price} too close to current {current_price} (min distance: {stop_level:.2f}) - using MARKET order")
                         order_type = mt5.ORDER_TYPE_BUY
                         action = "BUY MARKET"
-                        # Keep original entry_price for tracking, but use current_price for order execution
                         order_execution_price = current_price
                     else:
                         order_type = mt5.ORDER_TYPE_BUY_LIMIT
                         action = "BUY LIMIT"
                         order_execution_price = entry_price
                 else:
-                    # Price has passed entry - use MARKET order but preserve original entry_price for tracking
-                    order_type = mt5.ORDER_TYPE_BUY
-                    action = "BUY MARKET"
-                    order_execution_price = current_price
-                    self.logger.info(f"Price {current_price} passed entry {entry_price} - using MARKET order at current price, but tracking original entry")
+                    # Price has passed entry - STILL place LIMIT order at intended entry level
+                    # This ensures position opens at correct level (90130, 90094, 90058), not all at current price
+                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                    action = "BUY LIMIT"
+                    order_execution_price = entry_price
+                    self.logger.info(f"Price {current_price} passed entry {entry_price} - placing LIMIT order at intended entry (will fill when price returns)")
             else:  # SELL
                 # For SELL LIMIT: price must be ABOVE current BID by at least stop_level
                 # Get BID price for SELL orders
@@ -379,18 +383,18 @@ class MT5Engine:
                         self.logger.warning(f"SELL LIMIT price {entry_price} too close to current {current_bid} (min distance: {stop_level:.2f}) - using MARKET order")
                         order_type = mt5.ORDER_TYPE_SELL
                         action = "SELL MARKET"
-                        # Keep original entry_price for tracking, but use current_bid for order execution
                         order_execution_price = current_bid
                     else:
                         order_type = mt5.ORDER_TYPE_SELL_LIMIT
                         action = "SELL LIMIT"
                         order_execution_price = entry_price
                 else:
-                    # Price has passed entry - use MARKET order but preserve original entry_price for tracking
-                    order_type = mt5.ORDER_TYPE_SELL
-                    action = "SELL MARKET"
-                    order_execution_price = current_bid
-                    self.logger.info(f"Price {current_bid} passed entry {entry_price} - using MARKET order at current price, but tracking original entry")
+                    # Price has passed entry - STILL place LIMIT order at intended entry level
+                    # This ensures position opens at correct level, not all at current price
+                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                    action = "SELL LIMIT"
+                    order_execution_price = entry_price
+                    self.logger.info(f"Price {current_bid} passed entry {entry_price} - placing LIMIT order at intended entry (will fill when price returns)")
             
             # Prepare request
             # Symbol info already retrieved above for stop level validation
@@ -449,21 +453,16 @@ class MT5Engine:
             
             ticket = result.order if hasattr(result, 'order') else result.deal
             
-            # Log entry price (show original entry for MARKET orders if different from execution)
-            if 'MARKET' in action and original_entry_price != order_execution_price:
-                entry_log = f"{original_entry_price} (filled @ {order_execution_price})"
-            else:
-                entry_log = str(entry_price)
-            
             # Confirm SL/TP are attached
+            # entry_price is preserved at intended level (90130, 90094, 90058) for proper tracking
             if sl and tp:
-                self.logger.info(f"✅ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_log} | SL={sl} TP={tp} ATTACHED")
+                self.logger.info(f"✅ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | SL={sl} TP={tp} ATTACHED")
             elif sl:
-                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_log} | SL={sl} (NO TP)")
+                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | SL={sl} (NO TP)")
             elif tp:
-                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_log} | TP={tp} (NO SL - DANGEROUS!)")
+                self.logger.info(f"⚠️ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | TP={tp} (NO SL - DANGEROUS!)")
             else:
-                self.logger.warning(f"❌ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_log} | NO SL/TP - UNPROTECTED!")
+                self.logger.warning(f"❌ {action} #{ticket}: {symbol} {lot_size} lot @ {entry_price} | NO SL/TP - UNPROTECTED!")
             
             return ticket
             
