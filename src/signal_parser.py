@@ -215,20 +215,23 @@ class SignalParser:
             Symbol or None
         """
         # Common forex and commodity symbols
+        # IMPORTANT: Check longer symbols first (BTCUSD before BTC) to avoid false matches
         symbols = [
-            'XAUUSD', 'GOLD', 'GBPUSD', 'EURUSD', 'USDJPY', 'AUDUSD',
+            'BTCUSD', 'XAUUSD', 'GOLD', 'GBPUSD', 'EURUSD', 'USDJPY', 'AUDUSD',
             'USDCAD', 'NZDUSD', 'USDCHF', 'EURJPY', 'GBPJPY', 'EURGBP',
-            'BTCUSD', 'ETHUSD', 'XAGUSD', 'SILVER'
+            'ETHUSD', 'XAGUSD', 'SILVER', 'BTC'  # BTC must be after BTCUSD
         ]
         
         text_upper = text.upper()
         for symbol in symbols:
             if symbol in text_upper:
-                # Normalize gold/silver symbols
+                # Normalize symbols to standard format
                 if symbol == 'GOLD':
                     return 'XAUUSD'
                 elif symbol == 'SILVER':
                     return 'XAGUSD'
+                elif symbol == 'BTC':  # Map BTC to BTCUSD
+                    return 'BTCUSD'
                 return symbol
         
         return None
