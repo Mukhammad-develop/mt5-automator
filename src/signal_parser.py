@@ -22,7 +22,7 @@ class SignalParser:
         self.logger = create_class_logger('SignalParser')
         self.config = config
         self.trading_config = config.get('trading', {})
-        self.default_symbol = self.trading_config.get('default_symbol', 'XAUUSD')
+        self.default_symbol = self.trading_config.get('default_symbol', 'BTCUSD')
         
         self.logger.info("SignalParser initialized")
     

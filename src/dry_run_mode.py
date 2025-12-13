@@ -335,7 +335,7 @@ def main():
     # Test signal
     test_signal = {
         'direction': 'BUY',
-        'symbol': 'XAUUSD',
+        'symbol': 'BTCUSD',
         'entry_upper': 2650.50,
         'entry_middle': 2649.35,
         'entry_lower': 2648.20,

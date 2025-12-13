@@ -32,7 +32,7 @@ class MT5Engine:
         self.path = self.mt5_config.get('path', '')
         
         # Trading settings
-        self.default_symbol = self.trading_config.get('default_symbol', 'XAUUSD')
+        self.default_symbol = self.trading_config.get('default_symbol', 'BTCUSD')
         self.symbol_mapping = self.trading_config.get('symbol_mapping', {})
         
         # Connection status
@@ -266,6 +266,9 @@ class MT5Engine:
                         self.logger.info(f"🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
                     else:
                         tp = signal.get('tp2')
+                else:
+                    self.logger.error(f"Invalid position number for SELL: {position_num} (must be 1, 2, or 3)")
+                    return None
             else:  # BUY
                 # BUY: Position 1 = entry_upper (closest, closes at TP1), Position 3 = entry_lower (farthest, runner)
                 if position_num == 1:
@@ -294,9 +297,9 @@ class MT5Engine:
                         self.logger.info(f"🏃 Position 3 configured as RUNNER (no TP, trailing stop after TP2)")
                     else:
                         tp = signal.get('tp2')
-            else:
-                self.logger.error(f"Invalid position number: {position_num}")
-                return None
+                else:
+                    self.logger.error(f"Invalid position number for BUY: {position_num} (must be 1, 2, or 3)")
+                    return None
             
             # Get current price (simplified like dry-run: use ask for simplicity)
             # Note: Using ask works for both BUY and SELL for order type determination
@@ -715,9 +718,9 @@ def main():
             logger.info(f"Account: {account_info}")
         
         # Get symbol info
-        symbol_info = engine.get_symbol_info('XAUUSD')
+        symbol_info = engine.get_symbol_info('BTCUSD')
         if symbol_info:
-            logger.info(f"XAUUSD: Bid={symbol_info['bid']}, Ask={symbol_info['ask']}")
+            logger.info(f"BTCUSD: Bid={symbol_info['bid']}, Ask={symbol_info['ask']}")
         
         # Disconnect
         engine.disconnect()

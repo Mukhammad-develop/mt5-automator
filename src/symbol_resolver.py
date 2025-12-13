@@ -30,6 +30,7 @@ class SymbolResolver:
         
         # Common symbol variations to try
         self.common_variations = {
+            'BTCUSD': ['BTCUSD', 'BTCUSD+', 'BTCUSD.', 'BTCUSDm', '#BTCUSD', 'BTC', 'BTCUSDT', 'BTC/USD'],
             'XAUUSD': ['XAUUSD', 'XAUUSD+', 'XAUUSD.', 'XAUUSDm', '#XAUUSD', 'GOLD', 'GOLDm', 'GOLD.'],
             'EURUSD': ['EURUSD', 'EURUSD+', 'EURUSD.', 'EURUSDm', '#EURUSD', 'EURUSD.a', 'EURUSDc'],
             'GBPUSD': ['GBPUSD', 'GBPUSD+', 'GBPUSD.', 'GBPUSDm', '#GBPUSD', 'GBPUSD.a', 'GBPUSDc'],
