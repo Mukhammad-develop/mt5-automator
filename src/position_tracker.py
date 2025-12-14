@@ -214,7 +214,7 @@ class PositionTracker:
                 self.tp2_reached_signals.add(signal_id)
                 self.logger.warning(f"🎯 TP2 REACHED for signal {signal_id} at price {current_price}")
                 
-                # Find Position 3 and activate trailing
+                # Find Position 3 and activate trailing immediately
                 for position in positions:
                     # Check if this is Position 3 (from comment field)
                     comment = position.get('comment', '')
@@ -222,10 +222,37 @@ class PositionTracker:
                         ticket = position['ticket']
                         if ticket not in self.position_3_trailing_activated:
                             self.position_3_trailing_activated.add(ticket)
-                            self.logger.warning(f"🏃 Position 3 #{ticket} RUNNER activated - Trailing stop now enabled!")
                             
-                            # Initialize best price for trailing
-                            self.position_best_prices[ticket] = current_price
+                            # Calculate pip value for trailing distance
+                            symbol = signal['symbol']
+                            if 'XAU' in symbol or 'GOLD' in symbol or 'BTC' in symbol:
+                                pip_value = 0.01  # For gold and BTC
+                            elif 'JPY' in symbol:
+                                pip_value = 0.01
+                            else:
+                                pip_value = 0.0001
+                            
+                            trailing_distance = self.trailing_stop_pips * pip_value
+                            
+                            # CRITICAL: Immediately set SL to TP2 minus trailing_distance
+                            # This locks in profit at TP2 level minus 20 pips
+                            if direction == 'BUY':
+                                # For BUY: SL should be TP2 minus trailing_distance (below TP2)
+                                new_sl = tp2_price - trailing_distance
+                            else:  # SELL
+                                # For SELL: SL should be TP2 plus trailing_distance (above TP2)
+                                new_sl = tp2_price + trailing_distance
+                            
+                            # Set best price to TP2 (or current_price if at TP2)
+                            tp2_or_current = current_price if abs(current_price - tp2_price) < pip_value else tp2_price
+                            self.position_best_prices[ticket] = tp2_or_current
+                            
+                            # Immediately update SL to TP2 minus trailing_distance
+                            if self.mt5_engine.modify_position(ticket, sl=new_sl):
+                                self.logger.warning(f"🏃 Position 3 #{ticket} RUNNER activated - SL set to {new_sl} (TP2 {tp2_price} - {self.trailing_stop_pips} pips)")
+                            else:
+                                self.logger.error(f"❌ Failed to set trailing stop for Position 3 #{ticket}")
+                            
                             break
         
         except Exception as e:
@@ -252,16 +279,19 @@ class PositionTracker:
             
             # Check if this is Position 3 with runner strategy
             is_position_3 = '_pos3' in comment
+            tp2_reached_for_position_3 = False
             if is_position_3 and self.position_3_runner_enabled and self.position_3_trailing_after_tp2:
                 # Position 3: Only trail if TP2 has been reached
                 if ticket not in self.position_3_trailing_activated:
                     # TP2 not reached yet, don't trail
                     return
+                tp2_reached_for_position_3 = True  # Skip activation_distance check for Position 3 after TP2
             
             # Calculate pip value based on symbol
             # For GOLD (XAUUSD): 1 pip = 0.01
+            # For BTC: 1 pip = 0.01 (similar to gold)
             # For Forex pairs: 1 pip = 0.0001 (except JPY pairs: 0.01)
-            if 'XAU' in symbol or 'GOLD' in symbol:
+            if 'XAU' in symbol or 'GOLD' in symbol or 'BTC' in symbol:
                 pip_value = 0.01
             elif 'JPY' in symbol:
                 pip_value = 0.01
@@ -279,7 +309,8 @@ class PositionTracker:
                 profit_distance = entry_price - current_price
             
             # Check if position is profitable enough to activate trailing stop
-            if profit_distance < activation_distance:
+            # SKIP this check for Position 3 after TP2 is reached (already activated)
+            if not tp2_reached_for_position_3 and profit_distance < activation_distance:
                 # Not enough profit yet, don't trail
                 return
             
