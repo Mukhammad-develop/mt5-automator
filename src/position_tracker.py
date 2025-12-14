@@ -347,6 +347,31 @@ class PositionTracker:
                 should_move = not current_sl or current_sl == 0 or new_sl < current_sl
             
             if should_move:
+                # Validate SL distance against broker's minimum stop level
+                symbol_info = self.mt5_engine.get_symbol_info(symbol)
+                if symbol_info:
+                    # Get broker's minimum stop level
+                    import MetaTrader5 as mt5
+                    mt5_symbol_info = mt5.symbol_info(symbol)
+                    if mt5_symbol_info:
+                        stop_level = mt5_symbol_info.trade_stops_level * mt5_symbol_info.point
+                        if stop_level > 0:
+                            # Check if new_sl meets minimum distance requirement
+                            if direction == 'BUY':
+                                # For BUY: SL must be at least stop_level below current price
+                                min_sl = current_price - stop_level
+                                if new_sl > min_sl:
+                                    # SL too close to current price, skip update
+                                    self.logger.debug(f"Trailing stop SL {new_sl} too close to current {current_price} (min distance: {stop_level:.2f}) - skipping")
+                                    return
+                            else:  # SELL
+                                # For SELL: SL must be at least stop_level above current price
+                                max_sl = current_price + stop_level
+                                if new_sl < max_sl:
+                                    # SL too close to current price, skip update
+                                    self.logger.debug(f"Trailing stop SL {new_sl} too close to current {current_price} (min distance: {stop_level:.2f}) - skipping")
+                                    return
+                
                 # Move SL
                 success = self.mt5_engine.modify_position(ticket, sl=new_sl)
                 
