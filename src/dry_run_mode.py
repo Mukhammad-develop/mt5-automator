@@ -221,7 +221,15 @@ class DryRunMT5Engine:
             price_within_range = (entry_lower is not None and entry_upper is not None and 
                                  entry_lower <= current_bid <= entry_upper)
             
-            if position_num == 1 and price_within_range:
+            # Check if price is at entry_upper (start of range) - all positions should open immediately
+            at_entry_upper = (entry_upper is not None and abs(current_bid - entry_upper) < 1.0)  # Allow small tolerance
+            
+            if at_entry_upper:
+                # At entry_upper (start of range): All 3 positions use MARKET at current price
+                order_type = "SELL MARKET"
+                execution_entry = current_bid
+                self.logger.info(f"(DRY-RUN) Position {position_num}: Price {current_bid} is at entry_upper {entry_upper} (start of range) - using MARKET order")
+            elif position_num == 1 and price_within_range:
                 # Position 1: If price is within range, use MARKET at current price
                 order_type = "SELL MARKET"
                 execution_entry = current_bid
