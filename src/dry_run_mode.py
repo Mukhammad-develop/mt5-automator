@@ -214,6 +214,9 @@ class DryRunMT5Engine:
             if current_bid is None:
                 current_bid = current_price
             
+            # Get entry_middle for Position 2 logic
+            entry_middle = signal.get('entry_middle')
+            
             # Check if current price is within entry range
             price_within_range = (entry_lower is not None and entry_upper is not None and 
                                  entry_lower <= current_bid <= entry_upper)
@@ -223,11 +226,20 @@ class DryRunMT5Engine:
                 order_type = "SELL MARKET"
                 execution_entry = current_bid
                 self.logger.info(f"(DRY-RUN) Position 1: Price {current_bid} is within entry range [{entry_lower}-{entry_upper}] - using MARKET order")
+            elif position_num == 2 and entry_middle is not None and current_bid < entry_middle:
+                # Position 2: If price is BELOW entry_middle, use MARKET at current price (immediate entry)
+                # If price is ABOVE entry_middle, use LIMIT at entry_middle (wait for price to come down)
+                order_type = "SELL MARKET"
+                execution_entry = current_bid
+                self.logger.info(f"(DRY-RUN) Position 2: Price {current_bid} is below entry_middle {entry_middle} - using MARKET order")
             else:
-                # Position 1 (if outside range) or Positions 2&3: Always use LIMIT at intended entry
+                # Position 1 (if outside range), Position 2 (if above middle), or Position 3: Use LIMIT at intended entry
                 order_type = "SELL LIMIT"
                 execution_entry = entry
-                self.logger.info(f"(DRY-RUN) Position {position_num}: Placing SELL LIMIT at {entry} (current: {current_bid})")
+                if position_num == 2 and entry_middle is not None and current_bid >= entry_middle:
+                    self.logger.info(f"(DRY-RUN) Position 2: Price {current_bid} is above entry_middle {entry_middle} - placing LIMIT at {entry}")
+                else:
+                    self.logger.info(f"(DRY-RUN) Position {position_num}: Placing SELL LIMIT at {entry} (current: {current_bid})")
         
         # Use execution_entry for logging (preserve original entry for tracking)
         entry_for_log = execution_entry

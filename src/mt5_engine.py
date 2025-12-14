@@ -357,6 +357,9 @@ class MT5Engine:
                 if current_bid is None:
                     current_bid = current_price  # Fallback to ask if bid unavailable
                 
+                # Get entry_middle for Position 2 logic
+                entry_middle = signal.get('entry_middle')
+                
                 # Check if current price is within entry range (for SELL, entry_upper is higher, entry_lower is lower)
                 price_within_range = (entry_lower is not None and entry_upper is not None and 
                                      entry_lower <= current_bid <= entry_upper)
@@ -367,14 +370,20 @@ class MT5Engine:
                     action = "SELL MARKET"
                     order_execution_price = current_bid
                     self.logger.info(f"Position 1: Price {current_bid} is within entry range [{entry_lower}-{entry_upper}] - using MARKET order at current price")
+                elif position_num == 2 and entry_middle is not None and current_bid < entry_middle:
+                    # Position 2: If price is BELOW entry_middle, use MARKET at current price (immediate entry)
+                    # If price is ABOVE entry_middle, use LIMIT at entry_middle (wait for price to come down)
+                    order_type = mt5.ORDER_TYPE_SELL
+                    action = "SELL MARKET"
+                    order_execution_price = current_bid
+                    self.logger.info(f"Position 2: Price {current_bid} is below entry_middle {entry_middle} - using MARKET order at current price")
                 else:
-                    # Position 1 (if outside range) or Positions 2&3: Always use LIMIT at intended entry
+                    # Position 1 (if outside range), Position 2 (if above middle), or Position 3: Use LIMIT at intended entry
                     order_type = mt5.ORDER_TYPE_SELL_LIMIT
                     action = "SELL LIMIT"
                     order_execution_price = entry_price
-                    if price_within_range and position_num == 1:
-                        # This shouldn't happen, but log it
-                        self.logger.warning(f"Position 1: Price within range but using LIMIT - unexpected")
+                    if position_num == 2 and entry_middle is not None and current_bid >= entry_middle:
+                        self.logger.info(f"Position 2: Price {current_bid} is above entry_middle {entry_middle} - placing LIMIT at {entry_price}")
                     else:
                         self.logger.info(f"Position {position_num}: Placing SELL LIMIT at {entry_price} (current: {current_bid})")
             
