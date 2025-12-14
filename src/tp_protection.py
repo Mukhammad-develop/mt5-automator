@@ -73,17 +73,25 @@ class TP2Protection:
         try:
             self.logger.warning(f"Activating TP2 protection for signal {signal_id}")
             
-            # Cancel all pending orders for this signal
+            # Cancel all pending orders for this signal (CRITICAL: Must cancel LIMIT orders when TP2 reached)
             pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
+            
+            if pending_orders:
+                self.logger.warning(f"🛡️ TP2 Protection: Found {len(pending_orders)} pending order(s) to cancel for signal {signal_id}")
             
             cancelled_count = 0
             for order in pending_orders:
+                order_price = order.get('price_open', 'N/A')
                 if self.mt5_engine.cancel_pending_order(order['ticket']):
                     cancelled_count += 1
-                    self.logger.info(f"Cancelled pending order #{order['ticket']}")
+                    self.logger.warning(f"✅ Cancelled pending LIMIT order #{order['ticket']} at {order_price} (TP2 reached)")
+                else:
+                    self.logger.error(f"❌ Failed to cancel pending order #{order['ticket']} at {order_price}")
             
             if cancelled_count > 0:
-                self.logger.info(f"Cancelled {cancelled_count} pending orders for signal {signal_id}")
+                self.logger.warning(f"🛡️ Successfully cancelled {cancelled_count} pending LIMIT order(s) for signal {signal_id}")
+            elif pending_orders:
+                self.logger.error(f"❌ Failed to cancel any pending orders for signal {signal_id} (check MT5 connection)")
             
             # Move remaining positions to breakeven (protect profits)
             if move_to_breakeven:
@@ -227,7 +235,23 @@ class TP2Protection:
                         pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
                         positions = self.mt5_engine.get_positions_by_signal(signal_id)
                         
-                        # Only activate protection if there are pending orders OR open positions
+                        # CRITICAL: Always cancel pending orders when TP2 is reached, even if no positions
+                        # This ensures LIMIT orders (Positions 2 & 3) are canceled when TP2 is hit
+                        if pending_orders:
+                            self.logger.warning(f"TP2 reached - Canceling {len(pending_orders)} pending LIMIT order(s) for signal {signal_id}")
+                            # Cancel pending orders first
+                            cancelled_count = 0
+                            for order in pending_orders:
+                                if self.mt5_engine.cancel_pending_order(order['ticket']):
+                                    cancelled_count += 1
+                                    self.logger.info(f"✅ Cancelled pending order #{order['ticket']} at {order.get('price_open', 'N/A')}")
+                                else:
+                                    self.logger.error(f"❌ Failed to cancel pending order #{order['ticket']}")
+                            
+                            if cancelled_count > 0:
+                                self.logger.warning(f"🛡️ Cancelled {cancelled_count} pending order(s) - TP2 reached")
+                        
+                        # Activate protection if there are pending orders OR open positions
                         # This prevents false triggers when signal is already completed
                         if pending_orders or positions:
                             self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
