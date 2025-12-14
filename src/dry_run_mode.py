@@ -177,43 +177,60 @@ class DryRunMT5Engine:
                 else:
                     tp = signal.get('tp2')
         
-        # Determine order type
+        # Get current price
         current_price = self.get_current_price(symbol)
         
-        # STAGED ENTRY LOGIC: Prevents all 3 positions from filling at once
-        # Only place LIMIT orders at prices that haven't been touched yet
-        # If price has passed entry, allow MARKET order (client requirement)
-        if staged_entry_enabled:
-            if direction == 'BUY':
-                # For BUY: only place LIMIT if current price is BELOW entry
-                # If price already passed this entry, allow MARKET order (don't skip)
-                if current_price >= entry:
-                    # Price passed entry - will place MARKET order below
-                    self.logger.info(f"(DRY-RUN) Staged Entry: Price passed entry {entry} (current: {current_price}) - will place MARKET order")
-            else:  # SELL
-                # For SELL: only place LIMIT if current price is BELOW entry
-                # SELL LIMIT: sell at entry when price goes UP to it
-                # If current_price < entry: We CAN place SELL LIMIT (price will rise to entry)
-                # If current_price >= entry: Price already at or above entry, allow MARKET order (don't skip)
-                if current_price >= entry:
-                    # Price passed entry - will place MARKET order below
-                    self.logger.info(f"(DRY-RUN) Staged Entry: Price passed entry {entry} (current: {current_price}) - will place MARKET order")
+        # Get entry range for checking if price is within range
+        entry_upper = signal.get('entry_upper')
+        entry_lower = signal.get('entry_lower')
         
+        # CLIENT REQUIREMENT: Smart entry logic based on current price position
+        # If current price is WITHIN entry range (entry_lower ≤ current ≤ entry_upper):
+        #   - Position 1: MARKET at current price (immediate entry)
+        #   - Position 2: LIMIT at middle (wait for better entry)
+        #   - Position 3: LIMIT at lower (wait for better entry)
+        # If current price is OUTSIDE entry range:
+        #   - All positions: LIMIT at their intended levels
+        
+        # Determine order type based on position and price location
         if direction == 'BUY':
-            if current_price < entry:
-                order_type = "BUY LIMIT"
-            else:
+            # Check if current price is within entry range
+            price_within_range = (entry_lower is not None and entry_upper is not None and 
+                                 entry_lower <= current_price <= entry_upper)
+            
+            if position_num == 1 and price_within_range:
+                # Position 1: If price is within range, use MARKET at current price
                 order_type = "BUY MARKET"
-                entry = current_price
-        else:  # SELL
-            # For SELL LIMIT: sell at entry when price goes UP to it
-            # If current_price < entry: Place SELL LIMIT (price will rise to entry)
-            # If current_price >= entry: Place SELL MARKET (price already at/passed entry)
-            if current_price < entry:
-                order_type = "SELL LIMIT"
+                execution_entry = current_price
+                self.logger.info(f"(DRY-RUN) Position 1: Price {current_price} is within entry range [{entry_lower}-{entry_upper}] - using MARKET order")
             else:
+                # Position 1 (if outside range) or Positions 2&3: Always use LIMIT at intended entry
+                order_type = "BUY LIMIT"
+                execution_entry = entry
+                self.logger.info(f"(DRY-RUN) Position {position_num}: Placing BUY LIMIT at {entry} (current: {current_price})")
+        else:  # SELL
+            # For SELL, use bid price
+            current_bid = self.get_current_price(symbol, 'bid')
+            if current_bid is None:
+                current_bid = current_price
+            
+            # Check if current price is within entry range
+            price_within_range = (entry_lower is not None and entry_upper is not None and 
+                                 entry_lower <= current_bid <= entry_upper)
+            
+            if position_num == 1 and price_within_range:
+                # Position 1: If price is within range, use MARKET at current price
                 order_type = "SELL MARKET"
-                entry = current_price
+                execution_entry = current_bid
+                self.logger.info(f"(DRY-RUN) Position 1: Price {current_bid} is within entry range [{entry_lower}-{entry_upper}] - using MARKET order")
+            else:
+                # Position 1 (if outside range) or Positions 2&3: Always use LIMIT at intended entry
+                order_type = "SELL LIMIT"
+                execution_entry = entry
+                self.logger.info(f"(DRY-RUN) Position {position_num}: Placing SELL LIMIT at {entry} (current: {current_bid})")
+        
+        # Use execution_entry for logging (preserve original entry for tracking)
+        entry_for_log = execution_entry
         
         # CRITICAL: SL/TP attached to order from the start (simulated)
         # In real MT5, these are in the initial request, not added later!
