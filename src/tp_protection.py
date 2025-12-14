@@ -107,7 +107,9 @@ class TP2Protection:
     
     def _move_positions_to_breakeven(self, signal_id: str):
         """
-        Move all remaining positions for a signal to breakeven
+        Move remaining positions to breakeven (EXCEPT Position 3 runner)
+        
+        Position 3 (runner) should NOT be moved to breakeven - it uses trailing stop instead
         
         Args:
             signal_id: Signal ID
@@ -121,6 +123,9 @@ class TP2Protection:
             signal = signal_info.get('signal', {})
             direction = signal.get('direction', '')
             
+            # Check if Position 3 Runner is enabled
+            position_3_runner_enabled = self.trading_config.get('position_3_runner_enabled', True)
+            
             # Get open positions
             positions = self.mt5_engine.get_positions_by_signal(signal_id)
             
@@ -129,7 +134,16 @@ class TP2Protection:
                 return
             
             moved_count = 0
+            skipped_position_3 = 0
+            
             for position in positions:
+                # Check if this is Position 3 (runner) - skip it!
+                comment = position.get('comment', '')
+                if '_pos3' in comment and position_3_runner_enabled:
+                    self.logger.info(f"⏭️ Skipping Position 3 #{position['ticket']} - uses trailing stop, not breakeven")
+                    skipped_position_3 += 1
+                    continue
+                
                 entry_price = position['open_price']
                 current_sl = position.get('sl', 0)
                 
@@ -155,6 +169,8 @@ class TP2Protection:
             
             if moved_count > 0:
                 self.logger.warning(f"🛡️ Moved {moved_count} position(s) to BREAKEVEN (TP2 protection)")
+            if skipped_position_3 > 0:
+                self.logger.info(f"🏃 Position 3 runner(s) skipped - using trailing stop instead of breakeven")
             
         except Exception as e:
             self.logger.error(f"Error moving positions to breakeven: {e}", exc_info=True)
