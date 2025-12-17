@@ -688,13 +688,23 @@ class MT5Engine:
             List of order dictionaries
         """
         try:
+            # Get ALL pending orders (not filtered by symbol)
             orders = mt5.orders_get()
             if orders is None:
+                self.logger.debug(f"No pending orders found (orders_get returned None)")
+                return []
+            
+            if len(orders) == 0:
+                self.logger.debug(f"No pending orders found (empty list)")
                 return []
             
             signal_orders = []
+            self.logger.debug(f"Checking {len(orders)} pending order(s) for signal_id: {signal_id}")
+            
             for order in orders:
-                if signal_id in order.comment:
+                order_comment = order.comment if hasattr(order, 'comment') else ''
+                # Check if signal_id is in comment (format: {signal_id}_pos{position_num})
+                if signal_id in order_comment:
                     signal_orders.append({
                         'ticket': order.ticket,
                         'symbol': order.symbol,
@@ -703,13 +713,21 @@ class MT5Engine:
                         'price_open': order.price_open,
                         'sl': order.sl,
                         'tp': order.tp,
-                        'comment': order.comment
+                        'comment': order_comment
                     })
+                    self.logger.debug(f"Found pending order #{order.ticket} for signal {signal_id}: {order_comment} at {order.price_open}")
+                else:
+                    self.logger.debug(f"Order #{order.ticket} comment '{order_comment}' doesn't match signal_id '{signal_id}'")
+            
+            if signal_orders:
+                self.logger.warning(f"Found {len(signal_orders)} pending order(s) for signal {signal_id}")
+            else:
+                self.logger.debug(f"No pending orders found for signal {signal_id}")
             
             return signal_orders
             
         except Exception as e:
-            self.logger.error(f"Error getting pending orders: {e}")
+            self.logger.error(f"Error getting pending orders: {e}", exc_info=True)
             return []
 
 
