@@ -192,7 +192,8 @@ def _load_config_from_env() -> Dict[str, Any]:
             'channels': channels
         },
         'mt5': {
-            'login': int(os.getenv('MT5_LOGIN', '0')),
+            # Login can be numeric (account ID) or string (username) depending on broker
+            'login': os.getenv('MT5_LOGIN', '0'),
             'password': os.getenv('MT5_PASSWORD', ''),
             'server': os.getenv('MT5_SERVER', ''),
             'path': 'C:/Program Files/MetaTrader 5/terminal64.exe'

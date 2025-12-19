@@ -26,7 +26,16 @@ class MT5Engine:
         self.trading_config = config.get('trading', {})
         
         # MT5 credentials
-        self.login = int(self.mt5_config.get('login', 0))
+        # Login can be numeric (account ID) or string (username) depending on broker
+        login_value = self.mt5_config.get('login', '0')
+        try:
+            # Try to convert to int if it's numeric
+            self.login = int(login_value)
+        except (ValueError, TypeError):
+            # If it's a string username, keep it as string
+            # Note: Some brokers use string usernames, but MT5 API typically requires int
+            # This will be handled in connect() method
+            self.login = login_value
         self.password = self.mt5_config.get('password', '')
         self.server = self.mt5_config.get('server', '')
         self.path = self.mt5_config.get('path', '')
