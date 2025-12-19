@@ -73,12 +73,28 @@ class MT5Engine:
             
             # Login
             if self.login and self.password and self.server:
-                if not mt5.login(self.login, self.password, self.server):
-                    self.logger.error(f"MT5 login failed: {mt5.last_error()}")
+                # Convert login to int if it's a string (for brokers that use usernames)
+                # MT5 API requires integer login, but we'll try the string first
+                login_param = self.login
+                if isinstance(login_param, str):
+                    try:
+                        login_param = int(login_param)
+                    except ValueError:
+                        # If it's a non-numeric string, log warning and try anyway
+                        self.logger.warning(f"Login '{login_param}' is not numeric. Some brokers require numeric account IDs.")
+                        # Try to use as-is (MT5 might handle it, or will give a clear error)
+                        pass
+                
+                if not mt5.login(login_param, self.password, self.server):
+                    error_msg = mt5.last_error()
+                    self.logger.error(f"MT5 login failed: {error_msg}")
+                    if isinstance(self.login, str) and not self.login.isdigit():
+                        self.logger.error(f"Note: Login '{self.login}' is not numeric. MT5 typically requires a numeric account ID.")
+                        self.logger.error("Please check your MT5_LOGIN in config.env - it should be your account number (integer), not username.")
                     mt5.shutdown()
                     return False
                 
-                self.logger.info(f"Logged in to MT5 account: {self.login}")
+                self.logger.info(f"Logged in to MT5 account: {login_param}")
             else:
                 self.logger.warning("No login credentials provided, using current MT5 session")
             
