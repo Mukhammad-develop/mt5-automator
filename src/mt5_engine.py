@@ -60,21 +60,33 @@ class MT5Engine:
             True if connected successfully
         """
         try:
+            # Check if MT5 process is running (Windows only)
+            mt5_running = self._check_mt5_running()
+            if not mt5_running:
+                self.logger.error("="*60)
+                self.logger.error("MT5 TERMINAL IS NOT RUNNING!")
+                self.logger.error("")
+                self.logger.error("Please:")
+                self.logger.error("1. Open MetaTrader 5 terminal")
+                self.logger.error("2. Log in to your account")
+                self.logger.error("3. Keep the MT5 window open")
+                self.logger.error("4. Then run the bot again")
+                self.logger.error("="*60)
+                return False
+            
             # Initialize MT5
-            if self.path:
-                self.logger.info(f"Attempting to initialize MT5 from path: {self.path}")
-                if not os.path.exists(self.path):
-                    self.logger.error(f"MT5 path does not exist: {self.path}")
-                    self.logger.error("Please check MT5_PATH in config.env and ensure MT5 terminal is installed.")
-                    return False
-                if not mt5.initialize(path=self.path):
-                    error = mt5.last_error()
-                    self.logger.error(f"MT5 initialize failed: {error}")
-                    self._handle_initialization_error(error)
-                    return False
-            else:
-                self.logger.info("Attempting to initialize MT5 (auto-detect path)...")
-                if not mt5.initialize():
+            # Try without path first (auto-detect) - this is more reliable
+            self.logger.info("Attempting to initialize MT5 (auto-detect)...")
+            if not mt5.initialize():
+                # If auto-detect fails, try with explicit path
+                if self.path and os.path.exists(self.path):
+                    self.logger.info(f"Auto-detect failed, trying explicit path: {self.path}")
+                    if not mt5.initialize(path=self.path):
+                        error = mt5.last_error()
+                        self.logger.error(f"MT5 initialize failed: {error}")
+                        self._handle_initialization_error(error)
+                        return False
+                else:
                     error = mt5.last_error()
                     self.logger.error(f"MT5 initialize failed: {error}")
                     self._handle_initialization_error(error)
@@ -125,6 +137,58 @@ class MT5Engine:
             self.logger.error(f"Error connecting to MT5: {e}", exc_info=True)
             return False
     
+    def _check_mt5_running(self) -> bool:
+        """
+        Check if MT5 terminal process is running (Windows only)
+        
+        Returns:
+            True if MT5 process is found, False otherwise
+        """
+        try:
+            import subprocess
+            import platform
+            
+            # Only check on Windows
+            if platform.system() != 'Windows':
+                # On non-Windows, assume it might be running (can't check easily)
+                return True
+            
+            # Use tasklist on Windows to check for MT5 processes
+            try:
+                result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq terminal64.exe'], 
+                                      capture_output=True, text=True, timeout=5)
+                if 'terminal64.exe' in result.stdout:
+                    self.logger.info("Found MT5 terminal64.exe process")
+                    return True
+            except Exception:
+                pass
+            
+            # Also check for terminal.exe (32-bit or alternative name)
+            try:
+                result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq terminal.exe'], 
+                                      capture_output=True, text=True, timeout=5)
+                if 'terminal.exe' in result.stdout:
+                    self.logger.info("Found MT5 terminal.exe process")
+                    return True
+            except Exception:
+                pass
+            
+            # Check for any process with "metatrader" in the name
+            try:
+                result = subprocess.run(['tasklist'], 
+                                      capture_output=True, text=True, timeout=5)
+                if 'metatrader' in result.stdout.lower() or 'mt5' in result.stdout.lower():
+                    self.logger.info("Found MT5-related process")
+                    return True
+            except Exception:
+                pass
+            
+            return False
+        except Exception as e:
+            self.logger.warning(f"Could not check if MT5 is running: {e}")
+            # If we can't check, assume it might be running (don't block connection attempt)
+            return True
+    
     def _handle_initialization_error(self, error: Tuple[int, str]):
         """
         Provide helpful guidance for common MT5 initialization errors
@@ -137,19 +201,27 @@ class MT5Engine:
         if error_code == -10005:  # IPC timeout
             self.logger.error("="*60)
             self.logger.error("IPC TIMEOUT ERROR - Common causes:")
-            self.logger.error("1. MT5 terminal is NOT running")
-            self.logger.error("   -> Solution: Open MetaTrader 5 terminal first, then run the bot")
             self.logger.error("")
-            self.logger.error("2. MT5 path is incorrect")
+            self.logger.error("1. MT5 terminal is NOT running or not fully loaded")
+            self.logger.error("   -> Solution: Open MetaTrader 5 terminal, wait for it to fully load")
+            self.logger.error("   -> Make sure you can see the MT5 window (not just in system tray)")
+            self.logger.error("   -> Then run the bot again")
+            self.logger.error("")
+            self.logger.error("2. MT5 terminal needs to be restarted")
+            self.logger.error("   -> Solution: Close MT5 completely (File → Exit)")
+            self.logger.error("   -> Wait 5 seconds")
+            self.logger.error("   -> Open MT5 again and log in")
+            self.logger.error("   -> Then run the bot")
+            self.logger.error("")
+            self.logger.error("3. MT5 is running but API connection is blocked")
+            self.logger.error("   -> Solution: Try running MT5 as Administrator")
+            self.logger.error("   -> Or: Check Windows Firewall/Antivirus settings")
+            self.logger.error("   -> Or: Try removing MT5_PATH from config.env (let it auto-detect)")
+            self.logger.error("")
             if self.path:
-                self.logger.error(f"   -> Current path: {self.path}")
+                self.logger.error(f"4. Current MT5 path: {self.path}")
                 self.logger.error(f"   -> Path exists: {os.path.exists(self.path)}")
-            else:
-                self.logger.error("   -> No path specified in config.env")
-                self.logger.error("   -> Add MT5_PATH to config.env (e.g., C:/Program Files/MetaTrader 5/terminal64.exe)")
-            self.logger.error("")
-            self.logger.error("3. MT5 terminal is running but locked/busy")
-            self.logger.error("   -> Solution: Close and restart MT5 terminal")
+                self.logger.error("   -> Try removing MT5_PATH from config.env to use auto-detect")
             self.logger.error("="*60)
         elif error_code == -10001:  # Common initialization error
             self.logger.error("MT5 initialization failed - check if MT5 is installed and path is correct")
