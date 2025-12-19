@@ -74,23 +74,36 @@ class MT5Engine:
                 self.logger.error("="*60)
                 return False
             
-            # Initialize MT5
-            # Try without path first (auto-detect) - this is more reliable
-            self.logger.info("Attempting to initialize MT5 (auto-detect)...")
-            if not mt5.initialize():
+            # Initialize MT5 with retry mechanism
+            # Sometimes MT5 needs a moment to be ready, so we retry a few times
+            import time
+            max_retries = 3
+            retry_delay = 2  # seconds
+            
+            initialized = False
+            for attempt in range(1, max_retries + 1):
+                if attempt > 1:
+                    self.logger.info(f"Retry attempt {attempt}/{max_retries} after {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                
+                # Try without path first (auto-detect) - this is more reliable
+                self.logger.info(f"Attempting to initialize MT5 (auto-detect, attempt {attempt}/{max_retries})...")
+                if mt5.initialize():
+                    initialized = True
+                    break
+                
                 # If auto-detect fails, try with explicit path
                 if self.path and os.path.exists(self.path):
                     self.logger.info(f"Auto-detect failed, trying explicit path: {self.path}")
-                    if not mt5.initialize(path=self.path):
-                        error = mt5.last_error()
-                        self.logger.error(f"MT5 initialize failed: {error}")
-                        self._handle_initialization_error(error)
-                        return False
-                else:
-                    error = mt5.last_error()
-                    self.logger.error(f"MT5 initialize failed: {error}")
-                    self._handle_initialization_error(error)
-                    return False
+                    if mt5.initialize(path=self.path):
+                        initialized = True
+                        break
+            
+            if not initialized:
+                error = mt5.last_error()
+                self.logger.error(f"MT5 initialize failed after {max_retries} attempts: {error}")
+                self._handle_initialization_error(error)
+                return False
             
             self.logger.info("MT5 initialized successfully")
             
