@@ -230,7 +230,7 @@ def _load_config_from_env() -> Dict[str, Any]:
             'position_3_trailing_after_tp2': os.getenv('POSITION_3_TRAILING_AFTER_TP2', 'true').lower() == 'true'
         },
         'ocr': {
-            'tesseract_cmd': 'C:/Program Files/Tesseract-OCR/tesseract.exe',
+            'tesseract_cmd': os.getenv('TESSERACT_CMD', 'C:/Program Files/Tesseract-OCR/tesseract.exe'),
             'preprocessing': {
                 'resize_factor': 2.0,
                 'contrast_boost': True,
