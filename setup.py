@@ -102,21 +102,40 @@ def check_config_files():
         exists = os.path.exists(file)
         print_status(f"{desc}", exists, f"File: {file}")
         if not exists and file == 'config.env':
-            print_status("", False, "  -> Copy config.env.example to config.env and edit it")
-            all_exist = False
+            # Try to create from example
+            if os.path.exists('config.env.example'):
+                try:
+                    import shutil
+                    shutil.copy('config.env.example', 'config.env')
+                    print_status("", True, "  -> Created config.env from config.env.example")
+                    print_status("", False, "  -> IMPORTANT: Edit config.env with your credentials!")
+                    all_exist = True  # File now exists
+                except Exception as e:
+                    print_status("", False, f"  -> Failed to create: {e}")
+                    print_status("", False, "  -> Manually copy config.env.example to config.env")
+                    all_exist = False
+            else:
+                print_status("", False, "  -> Copy config.env.example to config.env and edit it")
+                all_exist = False
     
     return all_exist
 
 def check_directories():
-    """Check if required directories exist"""
-    dirs = ['src', 'config', 'logs', 'data', 'tests']
+    """Check if required directories exist, create if missing"""
+    dirs = ['src', 'config', 'logs', 'data', 'data/images', 'tests']
     
     all_exist = True
     for dir_name in dirs:
         exists = os.path.isdir(dir_name)
-        print_status(f"Directory: {dir_name}", exists)
         if not exists:
-            all_exist = False
+            try:
+                os.makedirs(dir_name, exist_ok=True)
+                print_status(f"Directory: {dir_name}", True, "Created automatically")
+            except Exception as e:
+                print_status(f"Directory: {dir_name}", False, f"Failed to create: {e}")
+                all_exist = False
+        else:
+            print_status(f"Directory: {dir_name}", True)
     
     return all_exist
 
