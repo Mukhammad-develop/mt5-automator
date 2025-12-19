@@ -41,12 +41,18 @@ class SystemTester:
         }
     
     def test(self, name: str, func):
-        """Run a test and record result"""
+        """Run a test and record result (handles both sync and async functions)"""
         try:
             print(f"\n{'='*60}")
             print(f"Testing: {name}")
             print(f"{'='*60}")
-            result = func()
+            # Check if function is async
+            if asyncio.iscoroutinefunction(func):
+                # Run async function
+                result = asyncio.run(func())
+            else:
+                # Run sync function
+                result = func()
             if result:
                 print(f"✅ PASSED: {name}")
                 self.results['passed'].append(name)
@@ -125,8 +131,8 @@ class SystemTester:
                 return False
             print(f"  ✅ Parsed signal 2: {signal2['direction']} {signal2['symbol']}")
             
-            # Test signal 3: BTC detection
-            test_signal_3 = "btc buy NOW >>> @90300 90385"
+            # Test signal 3: BTC detection (with TP/SL for validation)
+            test_signal_3 = "btc buy NOW >>> @90300 90385 TP1: 90400 TP2: 90410 SL: 90200"
             signal3 = parser.parse_signal(test_signal_3)
             if not signal3:
                 print("  ❌ Failed to parse test signal 3")
@@ -361,12 +367,7 @@ class SystemTester:
         self.test("MT5 Connection", self.test_mt5_connection)
         self.test("Symbol Resolver", self.test_symbol_resolver)
         self.test("Risk Manager", self.test_risk_manager)
-        
-        # Run async tests
-        async def run_async_tests():
-            await self.test("Telegram Connection", self.test_telegram_connection)
-        
-        asyncio.run(run_async_tests())
+        self.test("Telegram Connection", self.test_telegram_connection)
         
         # Print summary
         self.print_summary()
