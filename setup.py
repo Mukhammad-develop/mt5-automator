@@ -68,57 +68,73 @@ def check_dependencies():
     return all_installed
 
 def check_tesseract():
-    """Check if Tesseract is installed"""
+    """Check if Tesseract is installed (in PATH or config.env)"""
+    # First try PATH
     try:
         result = subprocess.run(['tesseract', '--version'], 
                               capture_output=True, text=True, timeout=5)
         status = result.returncode == 0
         version = result.stdout.split('\n')[0] if status else ""
-        print_status("Tesseract OCR", status, version if status else "Not installed")
-        if not status:
-            print_status("", False, "  -> Set TESSERACT_CMD in config.env (see docs/FIX_TESSERACT_WINDOWS.md)")
-        return status
-    except FileNotFoundError:
-        print_status("Tesseract OCR", False, "Not found in PATH")
+        if status:
+            print_status("Tesseract OCR", True, version)
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        pass
+    
+    # If not in PATH, check config.env
+    tesseract_found = False
+    tesseract_path = None
+    
+    # Check config.env
+    if os.path.exists('config.env'):
+        try:
+            with open('config.env', 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip().startswith('TESSERACT_CMD='):
+                        tesseract_path = line.split('=', 1)[1].strip().strip('"').strip("'")
+                        if tesseract_path and os.path.exists(tesseract_path):
+                            tesseract_found = True
+                            print_status("Tesseract OCR", True, f"Found in config.env: {tesseract_path}")
+                            return True
+                        break
+        except Exception:
+            pass
+    
+    # If still not found
+    print_status("Tesseract OCR", False, "Not found in PATH")
+    if tesseract_path:
+        print_status("", False, f"  -> Path in config.env exists: {os.path.exists(tesseract_path) if tesseract_path else 'N/A'}")
+    else:
         print_status("", False, "  -> Set TESSERACT_CMD in config.env (see docs/FIX_TESSERACT_WINDOWS.md)")
-        return False
-    except subprocess.TimeoutExpired:
-        print_status("Tesseract OCR", False, "Command timed out")
-        return False
-    except Exception as e:
-        print_status("Tesseract OCR", False, f"Error: {e}")
-        print_status("", False, "  -> Set TESSERACT_CMD in config.env (see docs/FIX_TESSERACT_WINDOWS.md)")
-        return False
+    return False
 
 def check_config_files():
     """Check if configuration files exist"""
-    files = [
-        ('config.env', 'Configuration file (config.env)'),
-        ('config.env.example', 'Example config (config.env.example)')
-    ]
+    # Check config.env (main config file)
+    config_exists = os.path.exists('config.env')
+    print_status("Configuration file (config.env)", config_exists, "File: config.env")
     
-    all_exist = True
-    for file, desc in files:
-        exists = os.path.exists(file)
-        print_status(f"{desc}", exists, f"File: {file}")
-        if not exists and file == 'config.env':
-            # Try to create from example
-            if os.path.exists('config.env.example'):
-                try:
-                    import shutil
-                    shutil.copy('config.env.example', 'config.env')
-                    print_status("", True, "  -> Created config.env from config.env.example")
-                    print_status("", False, "  -> IMPORTANT: Edit config.env with your credentials!")
-                    all_exist = True  # File now exists
-                except Exception as e:
-                    print_status("", False, f"  -> Failed to create: {e}")
-                    print_status("", False, "  -> Manually copy config.env.example to config.env")
-                    all_exist = False
-            else:
-                print_status("", False, "  -> Copy config.env.example to config.env and edit it")
-                all_exist = False
+    if not config_exists:
+        # Try to create from example
+        if os.path.exists('config.env.example'):
+            try:
+                import shutil
+                shutil.copy('config.env.example', 'config.env')
+                print_status("", True, "  -> Created config.env from config.env.example")
+                print_status("", False, "  -> IMPORTANT: Edit config.env with your credentials!")
+                config_exists = True
+            except Exception as e:
+                print_status("", False, f"  -> Failed to create: {e}")
+                print_status("", False, "  -> Manually copy config.env.example to config.env")
+        else:
+            print_status("", False, "  -> Copy config.env.example to config.env and edit it")
     
-    return all_exist
+    # Check example file (optional)
+    example_exists = os.path.exists('config.env.example')
+    print_status("Example config (config.env.example)", example_exists, "File: config.env.example")
+    
+    # Note: config/config.yaml is not required (project uses config.env)
+    return config_exists
 
 def check_directories():
     """Check if required directories exist, create if missing"""
