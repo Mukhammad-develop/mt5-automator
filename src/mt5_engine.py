@@ -3,7 +3,8 @@ MT5 Trading Engine
 Handles MetaTrader 5 connection and trade execution
 """
 import MetaTrader5 as mt5
-from typing import Dict, Any, Optional, List
+import os
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from src.utils import create_class_logger
 
@@ -61,15 +62,25 @@ class MT5Engine:
         try:
             # Initialize MT5
             if self.path:
+                self.logger.info(f"Attempting to initialize MT5 from path: {self.path}")
+                if not os.path.exists(self.path):
+                    self.logger.error(f"MT5 path does not exist: {self.path}")
+                    self.logger.error("Please check MT5_PATH in config.env and ensure MT5 terminal is installed.")
+                    return False
                 if not mt5.initialize(path=self.path):
-                    self.logger.error(f"MT5 initialize failed: {mt5.last_error()}")
+                    error = mt5.last_error()
+                    self.logger.error(f"MT5 initialize failed: {error}")
+                    self._handle_initialization_error(error)
                     return False
             else:
+                self.logger.info("Attempting to initialize MT5 (auto-detect path)...")
                 if not mt5.initialize():
-                    self.logger.error(f"MT5 initialize failed: {mt5.last_error()}")
+                    error = mt5.last_error()
+                    self.logger.error(f"MT5 initialize failed: {error}")
+                    self._handle_initialization_error(error)
                     return False
             
-            self.logger.info("MT5 initialized")
+            self.logger.info("MT5 initialized successfully")
             
             # Login
             if self.login and self.password and self.server:
@@ -113,6 +124,37 @@ class MT5Engine:
         except Exception as e:
             self.logger.error(f"Error connecting to MT5: {e}", exc_info=True)
             return False
+    
+    def _handle_initialization_error(self, error: Tuple[int, str]):
+        """
+        Provide helpful guidance for common MT5 initialization errors
+        
+        Args:
+            error: Tuple of (error_code, error_message) from mt5.last_error()
+        """
+        error_code, error_msg = error
+        
+        if error_code == -10005:  # IPC timeout
+            self.logger.error("="*60)
+            self.logger.error("IPC TIMEOUT ERROR - Common causes:")
+            self.logger.error("1. MT5 terminal is NOT running")
+            self.logger.error("   -> Solution: Open MetaTrader 5 terminal first, then run the bot")
+            self.logger.error("")
+            self.logger.error("2. MT5 path is incorrect")
+            if self.path:
+                self.logger.error(f"   -> Current path: {self.path}")
+                self.logger.error(f"   -> Path exists: {os.path.exists(self.path)}")
+            else:
+                self.logger.error("   -> No path specified in config.env")
+                self.logger.error("   -> Add MT5_PATH to config.env (e.g., C:/Program Files/MetaTrader 5/terminal64.exe)")
+            self.logger.error("")
+            self.logger.error("3. MT5 terminal is running but locked/busy")
+            self.logger.error("   -> Solution: Close and restart MT5 terminal")
+            self.logger.error("="*60)
+        elif error_code == -10001:  # Common initialization error
+            self.logger.error("MT5 initialization failed - check if MT5 is installed and path is correct")
+        else:
+            self.logger.error(f"MT5 error code: {error_code}, message: {error_msg}")
     
     def disconnect(self):
         """

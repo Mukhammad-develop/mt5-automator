@@ -196,7 +196,8 @@ def _load_config_from_env() -> Dict[str, Any]:
             'login': os.getenv('MT5_LOGIN', '0'),
             'password': os.getenv('MT5_PASSWORD', ''),
             'server': os.getenv('MT5_SERVER', ''),
-            'path': 'C:/Program Files/MetaTrader 5/terminal64.exe'
+            # MT5_PATH is optional - if not set, will try auto-detect
+            'path': os.getenv('MT5_PATH', 'C:/Program Files/MetaTrader 5/terminal64.exe')
         },
         'ai': {
             'enabled': True,
