@@ -76,6 +76,27 @@ class TP2Protection:
             # Cancel all pending orders for this signal (CRITICAL: Must cancel LIMIT orders when TP2 reached)
             pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
             
+            # FALLBACK: If signal_id matching fails, try to cancel ALL pending orders for the symbol
+            if not pending_orders:
+                signal_info = self.position_tracker.get_signal_info(signal_id)
+                if signal_info:
+                    signal = signal_info.get('signal', {})
+                    symbol = signal.get('symbol')
+                    if symbol:
+                        # Get ALL pending orders and filter by symbol as fallback
+                        import MetaTrader5 as mt5
+                        all_orders = mt5.orders_get()
+                        if all_orders:
+                            symbol_orders = [o for o in all_orders if o.symbol == symbol]
+                            if symbol_orders:
+                                self.logger.warning(f"⚠️ Signal ID matching failed, but found {len(symbol_orders)} pending order(s) for symbol {symbol} - will cancel as fallback")
+                                pending_orders = [{
+                                    'ticket': o.ticket,
+                                    'symbol': o.symbol,
+                                    'price_open': o.price_open,
+                                    'comment': o.comment if hasattr(o, 'comment') else ''
+                                } for o in symbol_orders]
+            
             if pending_orders:
                 self.logger.warning(f"🛡️ TP2 Protection: Found {len(pending_orders)} pending order(s) to cancel for signal {signal_id}")
             else:
@@ -85,7 +106,7 @@ class TP2Protection:
                 if all_orders:
                     self.logger.warning(f"⚠️ No pending orders found for signal {signal_id}, but {len(all_orders)} total pending order(s) exist:")
                     for order in all_orders:
-                        self.logger.warning(f"  - Order #{order.ticket}: {order.comment} at {order.price_open} ({order.symbol})")
+                        self.logger.warning(f"  - Order #{order.ticket}: {order.comment if hasattr(order, 'comment') else 'N/A'} at {order.price_open} ({order.symbol})")
                 else:
                     self.logger.info(f"No pending orders to cancel for signal {signal_id}")
             
@@ -265,8 +286,31 @@ class TP2Protection:
                         
                         # CRITICAL: Always cancel pending orders when TP2 is reached, even if no positions
                         # This ensures LIMIT orders (Positions 2 & 3) are canceled when TP2 is hit
+                        
+                        # FALLBACK: If signal_id matching fails, try to cancel ALL pending orders for the symbol
+                        # This handles cases where signal_id might not match exactly
+                        if not pending_orders:
+                            signal_info = self.position_tracker.get_signal_info(signal_id)
+                            if signal_info:
+                                signal = signal_info.get('signal', {})
+                                symbol = signal.get('symbol')
+                                if symbol:
+                                    # Get ALL pending orders and filter by symbol as fallback
+                                    import MetaTrader5 as mt5
+                                    all_orders = mt5.orders_get()
+                                    if all_orders:
+                                        symbol_orders = [o for o in all_orders if o.symbol == symbol]
+                                        if symbol_orders:
+                                            self.logger.warning(f"⚠️ Signal ID matching failed, but found {len(symbol_orders)} pending order(s) for symbol {symbol} - will cancel as fallback")
+                                            pending_orders = [{
+                                                'ticket': o.ticket,
+                                                'symbol': o.symbol,
+                                                'price_open': o.price_open,
+                                                'comment': o.comment if hasattr(o, 'comment') else ''
+                                            } for o in symbol_orders]
+                        
                         if pending_orders:
-                            self.logger.warning(f"TP2 reached - Canceling {len(pending_orders)} pending LIMIT order(s) for signal {signal_id}")
+                            self.logger.warning(f"🛡️ TP2 REACHED - Canceling {len(pending_orders)} pending LIMIT order(s) for signal {signal_id}")
                             # Cancel pending orders first (with retry logic)
                             cancelled_count = 0
                             failed_count = 0
@@ -274,10 +318,13 @@ class TP2Protection:
                                 order_ticket = order.get('ticket')
                                 order_price = order.get('price_open', 'N/A')
                                 order_symbol = order.get('symbol', 'N/A')
+                                order_comment = order.get('comment', 'N/A')
+                                
+                                self.logger.warning(f"Attempting to cancel pending order #{order_ticket} ({order_symbol}) at {order_price} (comment: {order_comment})")
                                 
                                 if self.mt5_engine.cancel_pending_order(order_ticket):
                                     cancelled_count += 1
-                                    self.logger.warning(f"✅ Cancelled pending order #{order_ticket} ({order_symbol}) at {order_price}")
+                                    self.logger.warning(f"✅ Successfully cancelled pending order #{order_ticket} ({order_symbol}) at {order_price}")
                                 else:
                                     failed_count += 1
                                     self.logger.error(f"❌ Failed to cancel pending order #{order_ticket} at {order_price} - will retry")
@@ -289,15 +336,15 @@ class TP2Protection:
                                         failed_count -= 1
                                         self.logger.warning(f"✅ Cancelled pending order #{order_ticket} on retry")
                                     else:
-                                        self.logger.error(f"❌ Failed to cancel pending order #{order_ticket} even after retry")
+                                        self.logger.error(f"❌ Failed to cancel pending order #{order_ticket} even after retry - manual cancellation may be required")
                             
                             if cancelled_count > 0:
-                                self.logger.warning(f"🛡️ Cancelled {cancelled_count} pending order(s) - TP2 reached")
+                                self.logger.warning(f"🛡️ Successfully cancelled {cancelled_count} pending order(s) - TP2 reached")
                             if failed_count > 0:
-                                self.logger.error(f"❌ Failed to cancel {failed_count} pending order(s) - check MT5 connection")
+                                self.logger.error(f"❌ CRITICAL: Failed to cancel {failed_count} pending order(s) - check MT5 connection and cancel manually if needed")
                         else:
                             # Log if no pending orders found (for debugging)
-                            self.logger.debug(f"TP2 reached for signal {signal_id}, but no pending orders found to cancel")
+                            self.logger.info(f"TP2 reached for signal {signal_id}, but no pending orders found to cancel (all may have been filled or already cancelled)")
                         
                         # Activate protection if there are pending orders OR open positions
                         # This prevents false triggers when signal is already completed

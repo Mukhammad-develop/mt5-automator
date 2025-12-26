@@ -596,11 +596,27 @@ class MT5Engine:
             result = mt5.order_send(request)
             
             if result is None:
-                self.logger.error("Order send failed: result is None")
+                self.logger.error(f"Order send failed: result is None for Position {position_num} ({action} {symbol} @ {order_execution_price})")
                 return None
             
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                self.logger.error(f"Order failed: {result.retcode} - {result.comment}")
+                error_msg = result.comment if hasattr(result, 'comment') else 'Unknown error'
+                self.logger.error(f"❌ Order failed for Position {position_num}: {result.retcode} - {error_msg}")
+                self.logger.error(f"   Details: {action} {symbol} {lot_size} lot @ {order_execution_price} (entry: {entry_price}, current: {current_price})")
+                self.logger.error(f"   SL: {sl}, TP: {tp}")
+                
+                # Provide helpful guidance for common errors
+                if result.retcode == 10015:  # Invalid price
+                    self.logger.error(f"   💡 Error 10015 (Invalid price) - Possible causes:")
+                    self.logger.error(f"      - Entry price {order_execution_price} is too far from current price {current_price}")
+                    self.logger.error(f"      - Price violates broker's minimum/maximum levels")
+                    self.logger.error(f"      - For LIMIT orders, price must be better than current (BUY LIMIT < current, SELL LIMIT > current)")
+                    if order_type in [mt5.ORDER_TYPE_BUY_LIMIT, mt5.ORDER_TYPE_SELL_LIMIT]:
+                        if direction == 'BUY' and order_execution_price >= current_price:
+                            self.logger.error(f"      - BUY LIMIT price {order_execution_price} must be BELOW current price {current_price}")
+                        elif direction == 'SELL' and order_execution_price <= current_price:
+                            self.logger.error(f"      - SELL LIMIT price {order_execution_price} must be ABOVE current price {current_price}")
+                
                 return None
             
             ticket = result.order if hasattr(result, 'order') else result.deal

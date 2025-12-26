@@ -294,9 +294,10 @@ class MT5Automator:
                 if ticket:
                     self.position_tracker.add_position(signal_id, ticket, i)
                     successful_orders += 1
-                    self.logger.info(f"Order {i} placed successfully: #{ticket}")
+                    self.logger.info(f"✅ Order {i} placed successfully: #{ticket}")
                 else:
-                    self.logger.error(f"Failed to place order {i}")
+                    self.logger.error(f"❌ Failed to place order {i}/{num_positions} - check error messages above for details")
+                    # Continue trying to place remaining positions even if one fails
             
             if successful_orders > 0:
                 self.logger.info(f"Successfully placed {successful_orders}/{num_positions} orders")

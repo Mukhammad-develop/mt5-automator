@@ -93,3 +93,4 @@ MT5_PATH=C:/Program Files/MetaTrader 5/terminal64.exe
 
 **Note:** `MT5_PATH` is optional. If not set, the bot will try to auto-detect MT5, but specifying it is more reliable.
 
+

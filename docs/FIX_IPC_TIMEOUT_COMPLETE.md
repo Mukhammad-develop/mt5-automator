@@ -124,3 +124,4 @@ MT5 connected successfully
 
 If you see this, the bot is ready to trade! 🎉
 
+

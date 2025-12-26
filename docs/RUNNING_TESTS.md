@@ -212,3 +212,4 @@ After tests pass:
 - **Troubleshooting:** Check logs in `logs/mt5_automator.log`
 - **Support:** Review other documentation in the `docs/` folder
 
+

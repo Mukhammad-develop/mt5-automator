@@ -143,3 +143,4 @@ py setup.py
 - **Python:** См. `docs/INSTALL_PYTHON_WINDOWS_RU.md`
 - **MT5 Server:** См. `docs/FIND_MT5_SERVER_RU.md`
 
+
