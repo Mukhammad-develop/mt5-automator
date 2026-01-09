@@ -259,7 +259,7 @@ class MT5Automator:
                 if atr_multiplier and hasattr(self.mt5_engine, 'get_atr'):
                     atr_value = self.mt5_engine.get_atr(signal['symbol'])
                     if atr_multiplier and atr_value is None:
-                    self.logger.info(f"ATR-based guard requested (multiplier={atr_multiplier}) but ATR unavailable, falling back to percent")
+                        self.logger.info(f"ATR-based guard requested (multiplier={atr_multiplier}) but ATR unavailable, falling back to percent")
             
                 guard = evaluate_entry_distance(
                     entry_upper=signal.get('entry_upper'),
