@@ -218,6 +218,8 @@ def _load_config_from_env() -> Dict[str, Any]:
             'risk_percent': float(os.getenv('RISK_PERCENT', '1.0')),
             'num_positions': int(os.getenv('NUM_POSITIONS', '3')),
             'default_symbol': os.getenv('DEFAULT_SYMBOL', 'BTCUSD'),
+            # Reject signals whose entry is too far from current price (percentage)
+            'max_entry_distance_percent': float(os.getenv('MAX_ENTRY_DISTANCE_PERCENT', '10.0')),
             'symbol_mapping': symbol_mapping,
             'breakeven_enabled': os.getenv('BREAKEVEN_ENABLED', 'false').lower() == 'true',
             'breakeven_trigger': os.getenv('BREAKEVEN_TRIGGER', 'middle_entry'),
@@ -478,4 +480,3 @@ def create_class_logger(class_name: str) -> logging.Logger:
         Logger instance
     """
     return logging.getLogger(f'MT5Automator.{class_name}')
-

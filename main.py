@@ -222,6 +222,11 @@ class MT5Automator:
             if not signal:
                 self.logger.warning("⚠️  Failed to parse signal")
                 return
+
+            # Validate AI-parsed signals with the same rules as regex parser
+            if not self.signal_parser.validate_signal(signal):
+                self.logger.warning("⚠️  Signal failed validation checks")
+                return
             
             # Resolve symbol to broker-specific name (automatic detection)
             if self.symbol_resolver:
@@ -230,6 +235,33 @@ class MT5Automator:
                 if broker_symbol != original_symbol:
                     self.logger.info(f"🔄 Symbol auto-resolved: {original_symbol} → {broker_symbol}")
                 signal['symbol'] = broker_symbol
+
+            # Sanity check: reject entries too far from current price
+            max_distance_percent = self.config.get('trading', {}).get('max_entry_distance_percent', 10.0)
+            if max_distance_percent and max_distance_percent > 0:
+                current_price = self.mt5_engine.get_current_price(signal['symbol'])
+                entry_upper = signal.get('entry_upper')
+                entry_lower = signal.get('entry_lower')
+                
+                if current_price and entry_upper is not None and entry_lower is not None:
+                    if current_price < entry_lower:
+                        distance = entry_lower - current_price
+                    elif current_price > entry_upper:
+                        distance = current_price - entry_upper
+                    else:
+                        distance = 0.0
+                    
+                    distance_percent = (distance / current_price) * 100.0 if current_price else 0.0
+                    
+                    if distance_percent > max_distance_percent:
+                        self.logger.warning(
+                            f"⚠️ Entry range too far from current price: "
+                            f"{distance_percent:.2f}% > {max_distance_percent:.2f}% "
+                            f"(current={current_price}, entry={entry_upper}-{entry_lower})"
+                        )
+                        return
+                else:
+                    self.logger.warning("⚠️ Could not validate entry distance (missing price or entry range)")
             
             # Log parsed signal (always show)
             signal_summary = f"📊 Parsed: {signal['direction']} {signal['symbol']} | Entry: {signal['entry_upper']}-{signal['entry_lower']} | TP: {signal.get('tp1')}/{signal.get('tp2')} | SL: {signal.get('sl1')}"
@@ -354,4 +386,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-

@@ -6,6 +6,7 @@ Also processes images directly using vision capabilities
 import os
 import json
 import base64
+import mimetypes
 import requests
 from typing import Dict, Any, Optional
 from src.utils import create_class_logger
@@ -32,6 +33,8 @@ class AISignalParser:
         self.api_key = os.getenv('DEEPSEEK_API_KEY', self.ai_config.get('api_key', ''))
         self.api_base = self.ai_config.get('api_base', 'https://api.deepseek.com/v1')
         self.model = self.ai_config.get('model', 'deepseek-chat')
+        self.vision_model = self.ai_config.get('vision_model', self.model)
+        self.use_vision = self.ai_config.get('use_vision', True)
         self.enabled = self.ai_config.get('enabled', False)
         
         if self.enabled and not self.api_key:
@@ -50,7 +53,7 @@ class AISignalParser:
         Returns:
             Parsed signal dictionary or None
         """
-        if not self.enabled:
+        if not self.enabled or not self.use_vision:
             self.logger.debug("AI parsing disabled, skipping image")
             return None
         
@@ -62,12 +65,13 @@ class AISignalParser:
                 image_data = f.read()
             
             image_base64 = base64.b64encode(image_data).decode('utf-8')
+            mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
             
             # Create vision prompt
             prompt = self._create_vision_prompt()
             
             # Call DeepSeek Vision API
-            response = self._call_deepseek_vision_api(prompt, image_base64)
+            response = self._call_deepseek_vision_api(prompt, image_base64, mime_type)
             
             if not response:
                 return None
@@ -216,7 +220,7 @@ JSON:"""
         
         return prompt
     
-    def _call_deepseek_vision_api(self, prompt: str, image_base64: str) -> Optional[str]:
+    def _call_deepseek_vision_api(self, prompt: str, image_base64: str, mime_type: str) -> Optional[str]:
         """
         Call DeepSeek Vision API
         
@@ -234,7 +238,7 @@ JSON:"""
             }
             
             payload = {
-                'model': 'deepseek-chat',  # Vision model
+                'model': self.vision_model,
                 'messages': [
                     {
                         'role': 'user',
@@ -246,7 +250,7 @@ JSON:"""
                             {
                                 'type': 'image_url',
                                 'image_url': {
-                                    'url': f'data:image/jpeg;base64,{image_base64}'
+                                    'url': f'data:{mime_type};base64,{image_base64}'
                                 }
                             }
                         ]
@@ -450,5 +454,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

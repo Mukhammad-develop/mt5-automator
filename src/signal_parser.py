@@ -310,6 +310,12 @@ class SignalParser:
         except Exception as e:
             self.logger.error(f"Error validating signal: {e}")
             return False
+
+    def validate_signal(self, signal: Dict[str, Any]) -> bool:
+        """
+        Public wrapper for signal validation (used for AI-parsed signals too).
+        """
+        return self._validate_signal(signal)
     
     def format_signal(self, signal: Dict[str, Any]) -> str:
         """
@@ -398,4 +404,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
