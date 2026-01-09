@@ -7,7 +7,8 @@ import sys
 import signal
 from typing import Dict, Any
 from src.utils import (load_config, setup_logging, generate_signal_id, 
-                       save_signal_to_db, check_signal_status, update_signal_status)
+                       save_signal_to_db, check_signal_status, update_signal_status,
+                       evaluate_entry_distance)
 from src.telegram_monitor import TelegramMonitor
 from src.ocr_processor import OCRProcessor
 from src.signal_parser import SignalParser
@@ -177,20 +178,28 @@ class MT5Automator:
             # Extract text
             text = signal_data['text']
             signal = None  # Initialize signal variable
+            ai_config = self.config.get('ai', {})
             
             # If photo, try AI vision first, fallback to OCR
             if signal_data['has_photo'] and signal_data['photo_path']:
                 self.logger.info("Signal contains image, processing...")
                 
-                # Try AI vision first (can understand images directly)
-                signal = self.ai_signal_parser.parse_signal_from_image(signal_data['photo_path'])
+                use_vision = ai_config.get('use_vision', True)
+                fallback_to_ocr = ai_config.get('fallback_to_ocr', True)
                 
-                if signal:
-                    self.logger.info("AI Vision successfully parsed image directly!")
-                    # Skip text parsing, we already have the signal
+                if use_vision:
+                    # Try AI vision first (can understand images directly)
+                    signal = self.ai_signal_parser.parse_signal_from_image(signal_data['photo_path'])
+                    
+                    if signal:
+                        self.logger.info("AI Vision successfully parsed image directly!")
+                        # Skip text parsing, we already have the signal
                 else:
+                    self.logger.info("AI Vision disabled by config (USE_VISION=false)")
+                
+                if not signal and fallback_to_ocr:
                     # Fallback to OCR if AI vision fails
-                    self.logger.info("AI Vision failed, trying OCR...")
+                    self.logger.info("AI Vision failed/disabled, trying OCR...")
                     ocr_text = self.ocr_processor.process_image(signal_data['photo_path'])
                     
                     if ocr_text:
@@ -199,6 +208,8 @@ class MT5Automator:
                         self.logger.info(f"OCR extracted {len(ocr_text)} characters")
                     else:
                         self.logger.warning("OCR also failed to extract text")
+                elif not signal and not fallback_to_ocr:
+                    self.logger.info("OCR fallback disabled (FALLBACK_TO_OCR=false)")
             
             # If we don't have signal from image, parse text
             if not signal:
@@ -213,11 +224,11 @@ class MT5Automator:
                 signal = self.ai_signal_parser.parse_signal(text)
                 
                 # Fallback to regex parser if AI fails or disabled
-                if not signal:
-                    ai_config = self.config.get('ai', {})
-                    if ai_config.get('fallback_to_regex', True):
-                        self.logger.info("Trying regex parser as fallback...")
-                        signal = self.signal_parser.parse_signal(text)
+                if not signal and ai_config.get('fallback_to_regex', True):
+                    self.logger.info("Trying regex parser as fallback...")
+                    signal = self.signal_parser.parse_signal(text)
+                elif not signal:
+                    self.logger.info("Regex fallback disabled (FALLBACK_TO_REGEX=false)")
             
             if not signal:
                 self.logger.warning("⚠️  Failed to parse signal")
@@ -235,32 +246,41 @@ class MT5Automator:
                 if broker_symbol != original_symbol:
                     self.logger.info(f"🔄 Symbol auto-resolved: {original_symbol} → {broker_symbol}")
                 signal['symbol'] = broker_symbol
-
+            
             # Sanity check: reject entries too far from current price
-            max_distance_percent = self.config.get('trading', {}).get('max_entry_distance_percent', 10.0)
-            if max_distance_percent and max_distance_percent > 0:
+            trading_cfg = self.config.get('trading', {})
+            max_distance_percent = trading_cfg.get('max_entry_distance_percent', 10.0)
+            atr_multiplier = trading_cfg.get('entry_distance_atr_multiplier', 0)
+            if (not max_distance_percent or max_distance_percent <= 0) and (not atr_multiplier or atr_multiplier <= 0):
+                pass  # Guard disabled
+            else:
                 current_price = self.mt5_engine.get_current_price(signal['symbol'])
-                entry_upper = signal.get('entry_upper')
-                entry_lower = signal.get('entry_lower')
+                atr_value = None
+                if atr_multiplier and hasattr(self.mt5_engine, 'get_atr'):
+                    atr_value = self.mt5_engine.get_atr(signal['symbol'])
+                    if atr_multiplier and atr_value is None:
+                    self.logger.info(f"ATR-based guard requested (multiplier={atr_multiplier}) but ATR unavailable, falling back to percent")
+            
+                guard = evaluate_entry_distance(
+                    entry_upper=signal.get('entry_upper'),
+                    entry_lower=signal.get('entry_lower'),
+                    current_price=current_price,
+                    percent_threshold=max_distance_percent or 0,
+                    atr=atr_value,
+                    atr_multiplier=atr_multiplier
+                )
                 
-                if current_price and entry_upper is not None and entry_lower is not None:
-                    if current_price < entry_lower:
-                        distance = entry_lower - current_price
-                    elif current_price > entry_upper:
-                        distance = current_price - entry_upper
-                    else:
-                        distance = 0.0
-                    
-                    distance_percent = (distance / current_price) * 100.0 if current_price else 0.0
-                    
-                    if distance_percent > max_distance_percent:
-                        self.logger.warning(
-                            f"⚠️ Entry range too far from current price: "
-                            f"{distance_percent:.2f}% > {max_distance_percent:.2f}% "
-                            f"(current={current_price}, entry={entry_upper}-{entry_lower})"
-                        )
-                        return
-                else:
+                if guard['exceeded']:
+                    reason = "ATR" if guard['reason'] == 'atr' else "percent"
+                    distance_pct = guard['distance_percent']
+                    threshold_pct = guard['threshold_percent']
+                    self.logger.warning(
+                        f"⚠️ Entry range too far from current price: "
+                        f"{distance_pct:.2f}% > {threshold_pct:.2f}% "
+                        f"(reason={reason}, current={current_price}, entry={signal.get('entry_upper')}-{signal.get('entry_lower')})"
+                    )
+                    return
+                elif guard['reason'] == 'insufficient_data':
                     self.logger.warning("⚠️ Could not validate entry distance (missing price or entry range)")
             
             # Log parsed signal (always show)

@@ -72,6 +72,10 @@ class MT5EngineMock:
             return 2650.00
         else:
             return 2650.05
+
+    def get_atr(self, symbol: str, timeframe=None, period: int = 14) -> Optional[float]:
+        """Return a mock ATR (disabled by default)"""
+        return None
     
     def place_order(self, signal: Dict[str, Any], position_num: int, 
                     lot_size: float, signal_id: str) -> Optional[int]:
@@ -154,5 +158,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

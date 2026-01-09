@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.signal_parser import SignalParser
-from src.utils import load_config
+from src.utils import load_config, evaluate_entry_distance
 
 
 def test_basic_buy_signal():
@@ -129,6 +129,35 @@ def test_invalid_signal():
     print("✓ Invalid signal rejection test passed")
 
 
+def test_missing_tp_sl_rejected():
+    """Ensure signals without TP and SL are rejected"""
+    config = {'trading': {'default_symbol': 'XAUUSD'}}
+    parser = SignalParser(config)
+    
+    text = "BUY 2650 - 2648"  # No TP/SL
+    signal = parser.parse_signal(text)
+    assert signal is None
+    print("✓ Missing TP/SL rejection test passed")
+
+
+def test_entry_distance_guard():
+    """Ensure entry distance guard flags far-away entries"""
+    current_price = 100.0
+    entry_upper = 200.0
+    entry_lower = 199.0
+    percent_threshold = 10.0
+    
+    result = evaluate_entry_distance(entry_upper, entry_lower, current_price, percent_threshold)
+    assert result['exceeded'] is True
+    assert result['reason'] == 'percent'
+    
+    # Within threshold should pass
+    close_result = evaluate_entry_distance(105.0, 95.0, current_price, percent_threshold)
+    assert close_result['exceeded'] is False
+    
+    print("✓ Entry distance guard test passed")
+
+
 def test_all():
     """Run all tests"""
     print("\nRunning Signal Parser Tests...")
@@ -139,6 +168,8 @@ def test_all():
     test_compact_format()
     test_detailed_format()
     test_invalid_signal()
+    test_missing_tp_sl_rejected()
+    test_entry_distance_guard()
     
     print("-" * 50)
     print("All tests passed! ✓\n")
@@ -146,4 +177,3 @@ def test_all():
 
 if __name__ == '__main__':
     test_all()
-

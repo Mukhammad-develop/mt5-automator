@@ -66,12 +66,13 @@ class AISignalParser:
             
             image_base64 = base64.b64encode(image_data).decode('utf-8')
             mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
+            image_size = len(image_data)
             
             # Create vision prompt
             prompt = self._create_vision_prompt()
             
             # Call DeepSeek Vision API
-            response = self._call_deepseek_vision_api(prompt, image_base64, mime_type)
+            response = self._call_deepseek_vision_api(prompt, image_base64, mime_type, image_size)
             
             if not response:
                 return None
@@ -220,7 +221,8 @@ JSON:"""
         
         return prompt
     
-    def _call_deepseek_vision_api(self, prompt: str, image_base64: str, mime_type: str) -> Optional[str]:
+    def _call_deepseek_vision_api(self, prompt: str, image_base64: str, mime_type: str,
+                                  image_size: int = 0, retry_on_400: bool = True) -> Optional[str]:
         """
         Call DeepSeek Vision API
         
@@ -270,7 +272,14 @@ JSON:"""
             )
             
             if response.status_code != 200:
-                self.logger.error(f"DeepSeek Vision API error: {response.status_code} - {response.text}")
+                body_preview = response.text[:400] if response.text else ''
+                self.logger.error(
+                    f"DeepSeek Vision API error (model={self.vision_model}, status={response.status_code}, "
+                    f"image_size={image_size} bytes): {body_preview}"
+                )
+                if retry_on_400 and response.status_code == 400:
+                    self.logger.info("Retrying Vision call with text-only payload after 400 response")
+                    return self._call_deepseek_api(prompt)
                 return None
             
             result = response.json()
@@ -322,7 +331,8 @@ JSON:"""
             )
             
             if response.status_code != 200:
-                self.logger.error(f"DeepSeek API error: {response.status_code} - {response.text}")
+                body_preview = response.text[:400] if response.text else ''
+                self.logger.error(f"DeepSeek API error (model={self.model}, status={response.status_code}): {body_preview}")
                 return None
             
             result = response.json()
@@ -454,4 +464,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

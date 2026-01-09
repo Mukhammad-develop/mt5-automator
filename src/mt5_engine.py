@@ -360,6 +360,55 @@ class MT5Engine:
         except Exception as e:
             self.logger.error(f"Error getting price for {symbol}: {e}")
             return None
+
+    def get_atr(self, symbol: str, timeframe=mt5.TIMEFRAME_M5, period: int = 14) -> Optional[float]:
+        """
+        Compute ATR for a symbol.
+        
+        Args:
+            symbol: Trading symbol
+            timeframe: MT5 timeframe (default M5)
+            period: ATR period
+            
+        Returns:
+            ATR value or None on failure
+        """
+        try:
+            symbol = self.map_symbol(symbol)
+            rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, period + 1)
+            if rates is None or len(rates) < period + 1:
+                self.logger.debug(f"ATR: insufficient data for {symbol} (need {period + 1}, got {0 if rates is None else len(rates)})")
+                return None
+            
+            true_ranges = []
+            prev_close = None
+            for r in rates:
+                high = r['high']
+                low = r['low']
+                close = r['close']
+                if prev_close is None:
+                    tr = high - low
+                else:
+                    tr = max(
+                        high - low,
+                        abs(high - prev_close),
+                        abs(low - prev_close)
+                    )
+                true_ranges.append(tr)
+                prev_close = close
+            
+            # Drop the first bar (has no prev_close reference)
+            if len(true_ranges) > 1:
+                true_ranges = true_ranges[1:]
+            
+            if not true_ranges:
+                return None
+            
+            atr = sum(true_ranges[-period:]) / min(period, len(true_ranges))
+            return atr
+        except Exception as e:
+            self.logger.error(f"Error calculating ATR for {symbol}: {e}")
+            return None
     
     def place_order(self, signal: Dict[str, Any], position_num: int, lot_size: float, 
                     signal_id: str) -> Optional[int]:
@@ -934,4 +983,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

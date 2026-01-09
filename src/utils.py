@@ -204,10 +204,10 @@ def _load_config_from_env() -> Dict[str, Any]:
             'api_key': os.getenv('DEEPSEEK_API_KEY', ''),
             'api_base': 'https://api.deepseek.com/v1',
             'model': 'deepseek-chat',
-            'vision_model': 'deepseek-reasoner',
-            'use_vision': True,
-            'fallback_to_ocr': True,
-            'fallback_to_regex': True,
+            'vision_model': os.getenv('DEEPSEEK_VISION_MODEL', os.getenv('DEEPSEEK_MODEL_VISION', 'deepseek-reasoner')),
+            'use_vision': os.getenv('USE_VISION', 'true').lower() == 'true',
+            'fallback_to_ocr': os.getenv('FALLBACK_TO_OCR', 'true').lower() == 'true',
+            'fallback_to_regex': os.getenv('FALLBACK_TO_REGEX', 'true').lower() == 'true',
             'max_retries': 2,
             'timeout': 30
         },
@@ -220,6 +220,7 @@ def _load_config_from_env() -> Dict[str, Any]:
             'default_symbol': os.getenv('DEFAULT_SYMBOL', 'BTCUSD'),
             # Reject signals whose entry is too far from current price (percentage)
             'max_entry_distance_percent': float(os.getenv('MAX_ENTRY_DISTANCE_PERCENT', '10.0')),
+            'entry_distance_atr_multiplier': float(os.getenv('ENTRY_DISTANCE_ATR_MULTIPLIER', '0')),
             'symbol_mapping': symbol_mapping,
             'breakeven_enabled': os.getenv('BREAKEVEN_ENABLED', 'false').lower() == 'true',
             'breakeven_trigger': os.getenv('BREAKEVEN_TRIGGER', 'middle_entry'),
@@ -400,6 +401,58 @@ def format_price(price: float, decimals: int = 2) -> str:
         Formatted price string
     """
     return f"{price:.{decimals}f}"
+
+
+def evaluate_entry_distance(entry_upper: float, entry_lower: float, current_price: float,
+                            percent_threshold: float, atr: Optional[float] = None,
+                            atr_multiplier: float = 0.0) -> Dict[str, Any]:
+    """
+    Evaluate how far the entry range is from the current price.
+    
+    Returns a dict with:
+    - exceeded: bool
+    - distance: float (price units)
+    - distance_percent: float
+    - threshold_price: float
+    - threshold_percent: float
+    - reason: str ('percent' or 'atr')
+    """
+    if current_price is None or entry_upper is None or entry_lower is None or current_price == 0:
+        return {
+            'exceeded': False,
+            'distance': None,
+            'distance_percent': None,
+            'threshold_price': None,
+            'threshold_percent': None,
+            'reason': 'insufficient_data'
+        }
+    
+    # If price inside range, distance is zero
+    if entry_lower <= current_price <= entry_upper:
+        distance = 0.0
+    else:
+        distance = min(abs(current_price - entry_upper), abs(current_price - entry_lower))
+    
+    # ATR-based threshold (preferred when available and configured)
+    use_atr = atr is not None and atr_multiplier and atr_multiplier > 0
+    if use_atr:
+        threshold_price = atr * atr_multiplier
+        reason = 'atr'
+    else:
+        threshold_price = (percent_threshold / 100.0) * current_price
+        reason = 'percent'
+    
+    threshold_percent = (threshold_price / current_price) * 100.0 if current_price else None
+    exceeded = distance > threshold_price if threshold_price is not None else False
+    
+    return {
+        'exceeded': exceeded,
+        'distance': distance,
+        'distance_percent': (distance / current_price) * 100.0 if current_price else None,
+        'threshold_price': threshold_price,
+        'threshold_percent': threshold_percent,
+        'reason': reason
+    }
 
 
 def calculate_pip_value(symbol: str, lot_size: float, account_currency: str = 'USD') -> float:
