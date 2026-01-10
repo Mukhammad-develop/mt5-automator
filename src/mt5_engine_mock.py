@@ -137,6 +137,11 @@ class MT5EngineMock:
         """Return mock pending orders"""
         return []
 
+    def was_tp_hit(self, signal_id: str, symbol: str, tp_price: float, direction: str,
+                   position_num: int = None, lookback_minutes: int = 120) -> bool:
+        """Mock TP hit check (always false)"""
+        return False
+
 
 def main():
     """Test mock engine"""
@@ -158,4 +163,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

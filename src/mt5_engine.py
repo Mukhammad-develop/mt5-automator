@@ -5,7 +5,7 @@ Handles MetaTrader 5 connection and trade execution
 import MetaTrader5 as mt5
 import os
 from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.utils import create_class_logger
 
 
@@ -922,11 +922,18 @@ class MT5Engine:
                 order_comment = order.comment if hasattr(order, 'comment') else ''
                 # Check if signal_id is in comment (format: {signal_id}_pos{position_num})
                 if signal_id in order_comment:
+                    volume = None
+                    if hasattr(order, 'volume'):
+                        volume = order.volume
+                    elif hasattr(order, 'volume_current'):
+                        volume = order.volume_current
+                    elif hasattr(order, 'volume_initial'):
+                        volume = order.volume_initial
                     signal_orders.append({
                         'ticket': order.ticket,
                         'symbol': order.symbol,
                         'type': order.type,
-                        'volume': order.volume,
+                        'volume': volume,
                         'price_open': order.price_open,
                         'sl': order.sl,
                         'tp': order.tp,
@@ -946,6 +953,65 @@ class MT5Engine:
         except Exception as e:
             self.logger.error(f"Error getting pending orders: {e}", exc_info=True)
             return []
+
+    def was_tp_hit(self, signal_id: str, symbol: str, tp_price: float, direction: str,
+                   position_num: int = None, lookback_minutes: int = 120) -> bool:
+        """
+        Check history to see if TP was hit for a signal.
+        
+        Args:
+            signal_id: Signal ID to match in deal comments
+            symbol: Trading symbol
+            tp_price: TP price to check
+            direction: BUY/SELL
+            position_num: Optional position number to match comment
+            lookback_minutes: How far back to scan history
+        """
+        try:
+            if tp_price is None:
+                return False
+            
+            symbol = self.map_symbol(symbol)
+            symbol_info = mt5.symbol_info(symbol)
+            if symbol_info is None:
+                return False
+            
+            tolerance = symbol_info.point * 2
+            end = datetime.now()
+            start = end - timedelta(minutes=lookback_minutes)
+            
+            deals = mt5.history_deals_get(start, end)
+            if not deals:
+                return False
+            
+            pos_tag = f"_pos{position_num}" if position_num else ""
+            
+            for deal in deals:
+                comment = getattr(deal, 'comment', '') or ''
+                if signal_id not in comment:
+                    continue
+                if pos_tag and pos_tag not in comment:
+                    continue
+                
+                entry_type = getattr(deal, 'entry', None)
+                if entry_type not in [mt5.DEAL_ENTRY_OUT, mt5.DEAL_ENTRY_INOUT]:
+                    continue
+                
+                price = getattr(deal, 'price', None)
+                if price is None:
+                    continue
+                
+                if direction == 'BUY':
+                    if price + tolerance >= tp_price:
+                        return True
+                else:
+                    if price - tolerance <= tp_price:
+                        return True
+            
+            return False
+        except Exception as e:
+            self.logger.error(f"Error checking TP hit from history: {e}", exc_info=True)
+            return False
 
 
 def main():

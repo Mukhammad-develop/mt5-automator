@@ -217,6 +217,16 @@ class PositionTracker:
                 if current_price <= tp2_price:
                     tp2_reached = True
             
+            # Fallback: check history if TP2 was hit and price has already retraced
+            if not tp2_reached and hasattr(self.mt5_engine, 'was_tp_hit'):
+                tp2_reached = self.mt5_engine.was_tp_hit(
+                    signal_id=signal_id,
+                    symbol=signal.get('symbol'),
+                    tp_price=tp2_price,
+                    direction=direction,
+                    position_num=2
+                )
+            
             if tp2_reached:
                 # Mark TP2 as reached for this signal
                 self.tp2_reached_signals.add(signal_id)
