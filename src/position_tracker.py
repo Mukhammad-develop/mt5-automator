@@ -154,7 +154,15 @@ class PositionTracker:
             positions = self.mt5_engine.get_positions_by_signal(signal_id)
             
             if not positions:
-                # All positions closed, remove signal
+                # If no open positions, only remove signal if there are no pending orders
+                pending_orders = self.mt5_engine.get_pending_orders_by_signal(signal_id)
+                if pending_orders:
+                    self.logger.info(
+                        f"No open positions for signal {signal_id}, but {len(pending_orders)} pending order(s) remain"
+                    )
+                    return
+                
+                # All positions closed and no pending orders, remove signal
                 self.logger.info(f"All positions closed for signal {signal_id}")
                 self.remove_signal(signal_id)
                 return
@@ -279,6 +287,9 @@ class PositionTracker:
             
             # Check if this is Position 3 with runner strategy
             is_position_3 = '_pos3' in comment
+            if self.position_3_runner_enabled and self.position_3_trailing_after_tp2 and not is_position_3:
+                # Only Position 3 should ever trail in runner mode
+                return
             tp2_reached_for_position_3 = False
             if is_position_3 and self.position_3_runner_enabled and self.position_3_trailing_after_tp2:
                 # Position 3: Only trail if TP2 has been reached
@@ -621,4 +632,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
