@@ -228,53 +228,77 @@ class PositionTracker:
                 )
             
             if tp2_reached:
-                # Mark TP2 as reached for this signal
-                self.tp2_reached_signals.add(signal_id)
-                self.logger.warning(f"🎯 TP2 REACHED for signal {signal_id} at price {current_price}")
-                
-                # Find Position 3 and activate trailing immediately
-                for position in positions:
-                    # Check if this is Position 3 (from comment field)
-                    comment = position.get('comment', '')
-                    if '_pos3' in comment:
-                        ticket = position['ticket']
-                        if ticket not in self.position_3_trailing_activated:
-                            self.position_3_trailing_activated.add(ticket)
-                            
-                            # Calculate pip value for trailing distance
-                            symbol = signal['symbol']
-                            if 'XAU' in symbol or 'GOLD' in symbol or 'BTC' in symbol:
-                                pip_value = 0.01  # For gold and BTC
-                            elif 'JPY' in symbol:
-                                pip_value = 0.01
-                            else:
-                                pip_value = 0.0001
-                            
-                            trailing_distance = self.trailing_stop_pips * pip_value
-                            
-                            # CRITICAL: Immediately set SL to TP2 minus trailing_distance
-                            # This locks in profit at TP2 level minus 20 pips
-                            if direction == 'BUY':
-                                # For BUY: SL should be TP2 minus trailing_distance (below TP2)
-                                new_sl = tp2_price - trailing_distance
-                            else:  # SELL
-                                # For SELL: SL should be TP2 plus trailing_distance (above TP2)
-                                new_sl = tp2_price + trailing_distance
-                            
-                            # Set best price to TP2 (or current_price if at TP2)
-                            tp2_or_current = current_price if abs(current_price - tp2_price) < pip_value else tp2_price
-                            self.position_best_prices[ticket] = tp2_or_current
-                            
-                            # Immediately update SL to TP2 minus trailing_distance
-                            if self.mt5_engine.modify_position(ticket, sl=new_sl):
-                                self.logger.warning(f"🏃 Position 3 #{ticket} RUNNER activated - SL set to {new_sl} (TP2 {tp2_price} - {self.trailing_stop_pips} pips)")
-                            else:
-                                self.logger.error(f"❌ Failed to set trailing stop for Position 3 #{ticket}")
-                            
-                            break
+                self.activate_position_3_trailing(signal_id, current_price=current_price, signal=signal)
         
         except Exception as e:
             self.logger.error(f"Error checking TP2 reached: {e}", exc_info=True)
+
+    def activate_position_3_trailing(self, signal_id: str, current_price: float = None,
+                                     signal: Dict[str, Any] = None) -> bool:
+        """
+        Activate trailing stop for Position 3 after TP2 is reached.
+        """
+        try:
+            signal_info = {'signal': signal} if signal else self.get_signal_info(signal_id)
+            if not signal_info:
+                return False
+            
+            signal = signal_info.get('signal', {})
+            tp2_price = signal.get('tp2')
+            direction = signal.get('direction', '')
+            if not tp2_price or not direction:
+                return False
+            
+            positions = self.mt5_engine.get_positions_by_signal(signal_id)
+            if not positions:
+                return False
+            
+            # Mark TP2 reached for the signal
+            self.tp2_reached_signals.add(signal_id)
+            
+            for position in positions:
+                comment = position.get('comment', '')
+                if '_pos3' not in comment:
+                    continue
+                
+                ticket = position['ticket']
+                if ticket in self.position_3_trailing_activated:
+                    return True
+                
+                # Calculate pip value for trailing distance
+                symbol = signal.get('symbol', '')
+                if 'XAU' in symbol or 'GOLD' in symbol or 'BTC' in symbol:
+                    pip_value = 0.01
+                elif 'JPY' in symbol:
+                    pip_value = 0.01
+                else:
+                    pip_value = 0.0001
+                
+                trailing_distance = self.trailing_stop_pips * pip_value
+                
+                if direction == 'BUY':
+                    new_sl = tp2_price - trailing_distance
+                else:
+                    new_sl = tp2_price + trailing_distance
+                
+                tp2_or_current = current_price if current_price is not None else tp2_price
+                self.position_best_prices[ticket] = tp2_or_current
+                
+                if self.mt5_engine.modify_position(ticket, sl=new_sl):
+                    self.position_3_trailing_activated.add(ticket)
+                    self.logger.warning(
+                        f"🏃 Position 3 #{ticket} RUNNER activated - SL set to {new_sl} "
+                        f"(TP2 {tp2_price} - {self.trailing_stop_pips} pips)"
+                    )
+                    return True
+                
+                self.logger.error(f"❌ Failed to set trailing stop for Position 3 #{ticket}")
+                return False
+            
+            return False
+        except Exception as e:
+            self.logger.error(f"Error activating Position 3 trailing: {e}", exc_info=True)
+            return False
     
     async def _check_trailing_stop(self, position: Dict[str, Any], signal: Dict[str, Any],
                                    current_price: float, direction: str, signal_id: str = None):

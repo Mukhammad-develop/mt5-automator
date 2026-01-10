@@ -350,6 +350,9 @@ class TP2Protection:
                         # This prevents false triggers when signal is already completed
                         if pending_orders or positions:
                             self.activate_protection(signal_id, move_to_breakeven=self.tp2_move_to_breakeven)
+                            # Ensure Position 3 trailing activates even if TP2 is detected here
+                            if hasattr(self.position_tracker, 'activate_position_3_trailing'):
+                                self.position_tracker.activate_position_3_trailing(signal_id)
                 
             except Exception as e:
                 self.logger.error(f"Error in TP2 monitoring loop: {e}", exc_info=True)
@@ -485,4 +488,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
