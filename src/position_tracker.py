@@ -102,6 +102,21 @@ class PositionTracker:
                 'opened_at': datetime.now().isoformat()
             })
             self.logger.info(f"Added position #{ticket} to signal {signal_id}")
+
+    def get_position_num(self, signal_id: str, ticket: int, comment: str = '') -> Optional[int]:
+        """
+        Resolve position number using tracked tickets (preferred) or comment fallback.
+        """
+        tracked = self.active_signals.get(signal_id, {}).get('positions', [])
+        for pos in tracked:
+            if pos.get('ticket') == ticket:
+                return pos.get('position_num')
+        if comment and '_pos' in comment:
+            try:
+                return int(comment.split('_pos')[-1])
+            except (ValueError, TypeError):
+                return None
+        return None
     
     def remove_signal(self, signal_id: str):
         """
@@ -258,7 +273,8 @@ class PositionTracker:
             
             for position in positions:
                 comment = position.get('comment', '')
-                if '_pos3' not in comment:
+                pos_num = self.get_position_num(signal_id, position['ticket'], comment)
+                if pos_num != 3:
                     continue
                 
                 ticket = position['ticket']
@@ -320,7 +336,8 @@ class PositionTracker:
             comment = position.get('comment', '')
             
             # Check if this is Position 3 with runner strategy
-            is_position_3 = '_pos3' in comment
+            pos_num = self.get_position_num(signal_id, ticket, comment)
+            is_position_3 = pos_num == 3
             if self.position_3_runner_enabled and self.position_3_trailing_after_tp2 and not is_position_3:
                 # Only Position 3 should ever trail in runner mode
                 return

@@ -196,7 +196,8 @@ class TP2Protection:
             for position in positions:
                 # Check if this is Position 3 (runner) - skip it!
                 comment = position.get('comment', '')
-                if '_pos3' in comment and position_3_runner_enabled:
+                pos_num = self.position_tracker.get_position_num(signal_id, position['ticket'], comment)
+                if pos_num == 3 and position_3_runner_enabled:
                     self.logger.info(f"⏭️ Skipping Position 3 #{position['ticket']} - uses trailing stop, not breakeven")
                     skipped_position_3 += 1
                     continue
