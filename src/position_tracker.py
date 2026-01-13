@@ -3,7 +3,7 @@ Position Tracker
 Monitors open positions and manages breakeven and TP/SL logic
 """
 import asyncio
-from typing import Dict, Any, Set, List
+from typing import Dict, Any, Set, List, Optional
 from datetime import datetime
 from src.utils import create_class_logger
 
