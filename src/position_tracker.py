@@ -281,6 +281,13 @@ class PositionTracker:
                 if ticket in self.position_3_trailing_activated:
                     return True
                 
+                # Use current price for initial trailing SL to avoid invalid stops
+                if current_price is None:
+                    price_type = 'ask' if direction == 'BUY' else 'bid'
+                    current_price = self.mt5_engine.get_current_price(signal.get('symbol', ''), price_type)
+                if current_price is None:
+                    return False
+                
                 # Calculate pip value for trailing distance
                 symbol = signal.get('symbol', '')
                 if 'XAU' in symbol or 'GOLD' in symbol or 'BTC' in symbol:
@@ -293,9 +300,26 @@ class PositionTracker:
                 trailing_distance = self.trailing_stop_pips * pip_value
                 
                 if direction == 'BUY':
-                    new_sl = tp2_price - trailing_distance
+                    new_sl = current_price - trailing_distance
                 else:
-                    new_sl = tp2_price + trailing_distance
+                    new_sl = current_price + trailing_distance
+                
+                # Respect broker minimum stop level
+                symbol_info = self.mt5_engine.get_symbol_info(symbol)
+                if symbol_info:
+                    import MetaTrader5 as mt5
+                    mt5_symbol_info = mt5.symbol_info(symbol)
+                    if mt5_symbol_info:
+                        stop_level = mt5_symbol_info.trade_stops_level * mt5_symbol_info.point
+                        if stop_level > 0:
+                            if direction == 'BUY':
+                                min_sl = current_price - stop_level
+                                if new_sl > min_sl:
+                                    new_sl = min_sl
+                            else:
+                                max_sl = current_price + stop_level
+                                if new_sl < max_sl:
+                                    new_sl = max_sl
                 
                 tp2_or_current = current_price if current_price is not None else tp2_price
                 self.position_best_prices[ticket] = tp2_or_current
@@ -304,7 +328,7 @@ class PositionTracker:
                     self.position_3_trailing_activated.add(ticket)
                     self.logger.warning(
                         f"🏃 Position 3 #{ticket} RUNNER activated - SL set to {new_sl} "
-                        f"(TP2 {tp2_price} - {self.trailing_stop_pips} pips)"
+                        f"(trail {self.trailing_stop_pips} pips from current)"
                     )
                     return True
                 
